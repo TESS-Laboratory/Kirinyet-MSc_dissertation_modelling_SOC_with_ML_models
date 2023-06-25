@@ -8,17 +8,23 @@ library(dplyr)
 library(sp)
 library(plyr)
 library(purrr)
-library(rgdal)
 library(ggplot2)
 library(rgeos)
 library(gganimate)
 library(ncdf4)
 library(mlr3verse)
 library(terra)
+library(readxl)
+library(janitor)
+library(tidyr)
+library(rasterVis) 
+library(geodata)
+inpath <- "C:\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\SOTWIS\\"
+
 # Load each shapefile Using SF package
-parametersestimates <- st_read("C:\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\SOTWIS\\SOTWIS_0-20cm_parametersestimates\\SOTWIS_SAFv1_t1s1d1.shp")
-soterunitcomposition <- st_read("C:\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\SOTWIS\\SOTWIS_soterunitcomposition\\SOTWIS_SAFv1_soterunitcomposition.shp")
-terrainproperties <- st_read("C:\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\SOTWIS\\SOTWIS_terrainproperties\\SOTWIS_SAFv1_terrainproperties.shp")
+parametersestimates <- st_read(paste0(inpath, "SOTWIS_0-20cm_parametersestimates\\SOTWIS_SAFv1_t1s1d1.shp"))
+soterunitcomposition <- st_read(paste0(inpath, "SOTWIS_soterunitcomposition\\SOTWIS_SAFv1_soterunitcomposition.shp"))
+terrainproperties <- st_read(paste0(inpath, "SOTWIS_terrainproperties\\SOTWIS_SAFv1_terrainproperties.shp"))
 primarydata <- st_read("C:\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\SOTER_primarydata\\SOTERSAFv1_newsuid.shp")
 
 for (dataset in list(parametersestimates, soterunitcomposition, terrainproperties, primarydata)) {
@@ -51,14 +57,22 @@ ggplot() +
   theme(legend.position = "bottom")
 
 
-# Load the South African shapefile
-south_africa <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\ZAF_adm2.shp")
+##‘GADM’ returns the global administrative boundaries- use to get za/ec(study area)
+iso3 <- geodata::country_codes()
 
-# Subset the South Africa data to create a spatial object for Eastern Cape
-eastern_cape <- south_africa[south_africa$NAME_1 == "Eastern Cape", ]
+iso3 %>%
+  as.data.frame() %>%
+  filter(NAME == "South Africa")
 
-# Check if the Eastern Cape data looks right
+za=getData('GADM', country='ZAF', level=1)
+plot(za)
+
+##lets check the lower adm boundaries
+za@data
+
+eastern_cape=subset(za,NAME_1=="Eastern Cape")
 plot(eastern_cape)
+
 
 # Now crop the properties to the Eastern Cape region 
 terrainproperties_cropped <- st_crop(terrainproperties, eastern_cape)
@@ -180,6 +194,56 @@ ESRIlulc2 <- raster("C:\\Eastern Cape data\\LULC\\35J_20170101-20180101.tif")
 ESRIlulc <- resample(ESRIlulc1, ESRIlulc2,  method='bilinear')  # or method='nearest')
 plot(ESRIlulc)
 
+##########################################################################################################
+##eastern cape data (points)
+# Reading the file
+data <- read_excel("C:/workspace/ocs_ec_data.xls")
+str(data)
+ocs_ec<- janitor::clean_names(data)
+View(ocs_ec)
+
+# convert the (x,y)degrees, minutes and seconds into decimal degrees format for computational purposes
+convert_DMS_to_DD <- function(dms_string) {
+  # Trim white spaces
+  dms_string <- trimws(dms_string)
+  
+  # Check if the input string is already in decimal degrees format
+  if (!grepl("’", dms_string)) {
+    # Remove the degree symbol if present
+    dms_string <- gsub("°", "", dms_string)
+    return(as.numeric(dms_string))
+  }
+  
+  # Extract degrees, minutes, and seconds using regular expressions
+  degrees <- as.numeric(gsub("^([0-9]+)°.*", "\\1", dms_string))
+  minutes <- as.numeric(gsub(".*°([0-9]+)’.*", "\\1", dms_string))
+  seconds <- as.numeric(gsub(".*’([0-9.]+)’’.*", "\\1", dms_string))
+  
+  # Convert to decimal degrees
+  decimal_degrees <- degrees + minutes / 60 + seconds / 3600
+  
+  # Check if it's South, which should be negative
+  if (grepl("S", dms_string, ignore.case = TRUE)) {
+    decimal_degrees <- -decimal_degrees
+  }
+  
+  return(decimal_degrees)
+}
+
+# Convert latitude and longitude values to decimal degrees
+ocs_ec <- ocs_ec %>% 
+  mutate(lat_decimal = sapply(lat, convert_DMS_to_DD),
+         long_decimal = sapply(long, convert_DMS_to_DD))
+
+# Show the updated dataframe
+print(ocs_ec)
+
+
+
+
+
+
+
 #####################################
 ## monthly precipitation (Pr) from TerraClimate:https://r-spatial.github.io/rgee/
 # Load required libraries
@@ -187,12 +251,12 @@ library(tidyverse)
 library(rgee)
 library(sf)
 
-# Initialize Earth Engine
-ee_Initialize()
+library(rgee)
 
 # Load shapefile
 south_africa <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\ZAF_adm2.shp")
 eastern_cape <- south_africa[south_africa$NAME_1 == "Eastern Cape", ]
+
 
 # Load ImageCollection and apply transformations
 terraclimate <- ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE") %>%
@@ -219,20 +283,14 @@ ee_eastern_cape_rain %>%
 
 
 
-########################Create an NDVI-animation
-library(magick)
-library(rgee)
-library(sf)
-
-ee_Initialize()
-
+########################NDVI
 # Load required libraries
 library(magick)
 library(rgee)
 library(sf)
 
 # Initialize Earth Engine
-ee_Initialize()
+#ee_Initialize()
 
 # Load the Eastern Cape shapefile
 mask <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\ZAF_adm2.shp")
@@ -297,19 +355,4 @@ rgbVis$map(function(image) {
 
 
 ###########################
-
-
-# Load necessary libraries
-library(rgdal)
-library(parallel)
-library(raster)
-library(data.table)
-load(".RData")
-# Load the functions
-source("/data/OpenLandData/R/OpenLandData_covs_functions.R")
-
-# Set time range and month list
-days <- as.numeric(format(seq(ISOdate(2021,1,1), ISOdate(2022,12,31), by="month"), "%j"))-1
-m.lst <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
-
 
