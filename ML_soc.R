@@ -1,9 +1,9 @@
 # load packages 
 library(raster)
-library (sf) # for handling spatial objects
+library (sf) 
 library (caret)
 library (randomForest)
-library(rgdal) # for reading shapefiles
+library(rgdal) 
 library(dplyr)
 library(sp)
 library(plyr)
@@ -19,6 +19,279 @@ library(janitor)
 library(tidyr)
 library(rasterVis) 
 library(geodata)
+library(elevatr)
+library(RColorBrewer)
+library(leaflet)
+library(gstat)
+
+
+
+
+##########################################################
+# Read the shapefile of study area
+mzimvubu <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\mzimvubu.shp")
+plot(mzimvubu, main="Mzimvubu")
+
+# Reading the data points file
+data <- read_excel("C:/workspace/ocs_ec_data.xls")
+str(data)
+data_clean<- janitor::clean_names(data)
+View(data_clean)
+
+# convert the (x,y)degrees, minutes and seconds into decimal degrees format for computational purposes
+convert_DMS_to_DD <- function(dms_string) {
+  # Trim white spaces
+  dms_string <- trimws(dms_string)
+  
+  # Check if the input string is already in decimal degrees format
+  if (!grepl("’", dms_string)) {
+    # Remove the degree symbol if present
+    dms_string <- gsub("°", "", dms_string)
+    return(as.numeric(dms_string))
+  }
+  
+  # Extract degrees, minutes, and seconds using regular expressions
+  degrees <- as.numeric(gsub("^([0-9]+)°.*", "\\1", dms_string))
+  minutes <- as.numeric(gsub(".*°([0-9]+)’.*", "\\1", dms_string))
+  seconds <- as.numeric(gsub(".*’([0-9.]+)’’.*", "\\1", dms_string))
+  
+  # Convert to decimal degrees
+  decimal_degrees <- degrees + minutes / 60 + seconds / 3600
+  
+  # Check if it's South, which should be negative
+  if (grepl("S", dms_string, ignore.case = TRUE)) {
+    decimal_degrees <- -decimal_degrees
+  }
+  
+  return(decimal_degrees)
+}
+
+# Convert latitude and longitude values to decimal degrees
+ocs_ec_df <- data_clean %>% 
+  mutate(lat_decimal = sapply(lat, convert_DMS_to_DD),
+         long_decimal = sapply(long, convert_DMS_to_DD))
+
+# Show the updated dataframe
+print(ocs_ec_df)
+str(ocs_ec_df)
+
+#Remove the missing values in x,y and convert to spatialpointdataframe
+ocs_ec_df <- ocs_ec_df[!is.na(ocs_ec_df$long_decimal) & !is.na(ocs_ec_df$lat_decimal), ]
+coordinates(ocs_ec_df) <- ~long_decimal + lat_decimal
+str(ocs_ec_df)
+
+
+# Convert the Eastern Cape shapefile and data points to an sf object
+mzimvubu_sf <- as(mzimvubu, "sf")
+ocs_ec_sf <- st_as_sf(ocs_ec_df) 
+
+# use WGS 84 (EPSG:4326) to set the Coordinate Reference System
+st_crs(mzimvubu_sf) <- 4326
+st_crs(ocs_ec_sf) <- 4326
+
+
+# Write to shapefile
+st_write(ocs_ec_sf, "C:\\workspace\\ec_data_shp//ec_4326_crs.shp")
+
+data_check<-readOGR("C:\\workspace\\ec_data_shp//ec_4326_crs.shp")
+head(data_check)# Display the first few rows of the data
+
+
+#data ranges for visualization
+bin_labels <- c("0-5", "5-10", "10-15", "15-20", "20-25", "25-30", "30-35", "35-40", "40-45", "45-50", "50-55", "55-60", "60-65", "65-70")
+
+# Specify distinct colors for each bin label 
+bin_colors <- c("0-5" = "#9400D3", "5-10" = "#4B0082", "10-15" = "#0000FF", "15-20" = "#00FF00",
+                "20-25" = "#FFFF00", "25-30" = "#FF7F00", "30-35" = "#FF0000", "35-40" = "#FF1493",
+                "40-45" = "#8B4513", "45-50" = "#9ACD32", "50-55" = "#FFD700", "55-60" = "#D2691E",
+                
+                "60-65" = "#F08080", "65-70" = "#ADFF2F")
+
+# Create bins for c_percent_scaled
+ocs_ec_sf$c_percent_scaled_bins <- cut(ocs_ec_df$c_percent * 10, 
+                                       breaks = seq(0, 70, by = 5), 
+                                       include.lowest = TRUE, 
+                                       labels = bin_labels)
+
+# Create the ggplot
+data_points <- ggplot() +
+  geom_sf(data = mzimvubu_sf, fill = "lightgray") +
+  geom_sf(data = ocs_ec_sf, aes(shape = treatment, color = c_percent_scaled_bins)) + # Map color to c_percent_scaled_bins
+  ggtitle("Soil Organic Carbon content in g/kg by Treatment") +
+  scale_color_manual(values = bin_colors) + # Using distinct colors for each bin
+  scale_shape_manual(values = c("RESTED" = 16, "GRAZED" = 17, "-" = 15)) + # 16 is a solid circle, 17 is a triangle, 15 is a square
+  labs(x = "Longitude", y = "Latitude", color = "C percent", shape = "Treatment Type") +
+  theme_minimal() 
+
+# Print the plot
+print(data_points)
+
+##########################################################
+#interactive maps for datapoints and c_percent
+# Extract longitude and latitude from geometry column
+coords <- st_coordinates(ocs_ec_sf$geometry)
+ocs_ec_sf$longitude <- coords[, 1]
+ocs_ec_sf$latitude <- coords[, 2]
+
+# Create the base map
+map <- leaflet() %>%
+  addTiles()  # Adds a default OpenStreetMap tile layer
+
+# Define a color palette for C percent values
+color_palette <- colorFactor(bin_colors, domain = ocs_ec_sf$c_percent_scaled_bins)
+
+# Add points to the map
+map <- map %>%
+  addCircleMarkers(
+    data = ocs_ec_sf,
+    lng = ~longitude,
+    lat = ~latitude,
+    color = ~color_palette(c_percent_scaled_bins),
+    popup = ~paste0("Treatment: ", treatment, "<br>",
+                    "C percent: ", c_percent) # Adding a popup to show info
+  )
+# Add Mzimvubu boundary to the map
+map <- map %>%
+  addPolygons(data = mzimvubu, weight = 2, color = "#FF5733", fillOpacity = 0)
+
+print(map)
+
+
+
+##########################################
+#estimating bulk density BERNOUX et al.1998/souza et al 2016
+ocs_ec_sf$BD <- 1.524 - (0.0046*ocs_ec_sf$clay_percent) - (0.051*ocs_ec_sf$c_percent)- (0.0045*ocs_ec_sf$ph_k_cl) + (0.001*ocs_ec_sf$sand_percent)
+
+# Create a scatter plot of c_percent vs BD
+plot <- ggplot(ocs_ec_sf, aes(x = c_percent, y = BD)) +
+  geom_point() +  # Use points to represent each data
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "C Percent", y = "BD", title = "Relationship between C Percent and BD") +
+  theme_minimal()
+
+print(plot)
+
+
+#Estimating the total cabon stock 
+depth = 40 #cm
+ocs_ec_sf$ocs<- ocs_ec_sf$c_percent * ocs_ec_sf$BD * depth  #t/ha seboko et al
+
+# Plot the point ocs
+
+ggplot() +
+  geom_sf(data = mzimvubu_sf, fill = "lightgray") +
+  geom_sf(data = ocs_ec_sf, aes(geometry = geometry, color = ocs), size = 4) +
+  scale_color_gradientn(colors = c("blue", "green", "yellow", "red"),
+                        name = "OCS (t/ha)") +
+  labs(title = "Soil Organic Carbon Stock at point",
+       x = "Longitude",
+       y = "Latitude") +
+  theme_minimal() 
+
+
+##################################
+#Elevation data and slope #https://rpubs.com/ials2un/boyaca_dem
+head(mzimvubu)
+mzimvubu_sf <- mzimvubu_sf[!st_is_empty(mzimvubu_sf),]
+elevation <- get_elev_raster(mzimvubu_sf,z=10)
+elevation
+
+mzimvubu_sp <- as(mzimvubu_sf, "Spatial")
+plot(elevation, main=" DEM [meters]")
+plot(mzimvubu_sp,col="NA",border="black", add=TRUE)
+text(coordinates(mzimvubu_sp), labels=as.character(mzimvubu_sf$MPIO_CNMBR), 
+     col="black", cex=0.20)
+
+hist(elevation)
+
+slope = terrain(elevation,opt='slope', unit='degrees')
+aspect = terrain(elevation,opt='aspect',unit='degrees')
+
+#Plot slope
+plot(slope,main="Slope for mzimvubu [degrees]", col=topo.colors(6,alpha=0.6))
+plot(mzimvubu, add=TRUE,col="NA",border="black", lwd=0.5)
+text(coordinates(mzimvubu_rep), labels=as.character(mzimvubu_rep$MPIO_CNMBR), cex=0.2)
+
+#Plot aspect.
+plot(aspect,main="Aspect for mzimvubu [degrees]", col=rainbow(10,alpha=0.7))
+plot(mzimvubu, add=TRUE,col="NA",border="black", lwd=0.5)
+text(coordinates(mzimvubu_rep), labels=as.character(mzimvubu_rep$MPIO_CNMBR), cex=0.2)
+
+
+#interactive mapping
+
+leaflet() %>% 
+  addMarkers(lng = 28, lat = -30, 
+             popup = "The view from here is amazing!") %>% 
+  addProviderTiles("Esri.WorldImagery") 
+
+library(leaflet)
+
+## Color ramps
+pal1 <- colorNumeric("YlGnBu", domain = ocs_ec_sf$c_percent)
+pal2 <- colorNumeric("YlOrBr", domain = values(elevation), na.color = "transparent")
+
+# Create interactive map
+leaflet() %>%
+  # Add raster layer for elevation
+  addProviderTiles("Esri.WorldImagery") %>%
+  addRasterImage(elevation, colors = pal2, opacity = 0.7) %>%
+  addLegend("topright", opacity = 0.8, pal = pal2, values = values(elevation), 
+            title = "Elevation") %>%
+  # Add points for Soil Organic Carbon
+  addCircleMarkers(data = ocs_ec_sf, color = ~pal1(c_percent),
+                   popup = ~sprintf("Soil Organic Carbon: %.2f%%<br>Treatment: %s", c_percent, treatment)) %>%
+  addLegend("bottomright", pal = pal1, values = ocs_ec_sf$c_percent,
+            title = "Soil Organic Carbon (%)", opacity = 0.8)
+
+
+
+############################
+
+dir_path <- "C:/workspace/Kirinyet-development/Data/covariate/wc2-5/bio_2-5m_bil"
+
+# List all the .bil files in the directory
+file_list <- list.files(path = dir_path, pattern = "\\.bil$", full.names = TRUE)
+
+# Create a raster stack from the list of  files
+bioclim <- stack(file_list)
+
+# Transform the CRS to match the raster
+mzimvubu <- st_transform(mzimvubu, st_crs(bioclim))
+
+# Now try cropping the raster
+cropped_bioclim <- crop(bioclim, extent(mzimvubu))
+
+layers_to_plot <- c(1, 12, 14, 19)
+par(mfrow = c(2, 2))# Set up a 2x2 plot layout
+
+for (i in layers_to_plot) {
+  plot(cropped_bioclim[[i]])
+}
+
+
+
+
+
+###################################LULC
+# Import raster layers
+ESRIlulc1 <- raster("C:\\Eastern Cape data\\LULC\\35J_20220101-20230101.tif")
+ESRIlulc2 <- raster("C:\\Eastern Cape data\\LULC\\35H_20220101-20230101.tif")
+
+# Merge raster layers into a single raster stack
+merged_raster <- merge(ESRIlulc1, ESRIlulc2)
+
+# Define area of interest using an extent object
+aoi_extent <- extent(xmin = 27, xmax = 29, ymin = -31, ymax = -30.1)
+
+# Crop the merged raster stack to the area of interest
+cropped_raster <- crop(merged_raster, aoi_extent)
+
+# Save the cropped raster stack as a file
+writeRaster(cropped_raster, "C:\workspace\Kirinyet-development\Data\covariate"/cropped_lulc_raster.tif, format = "GTiff")
+
+############################################
+
 inpath <- "C:\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\SOTWIS\\"
 
 # Load each shapefile Using SF package
@@ -50,28 +323,12 @@ ggplot() +
   theme(legend.position = "bottom")
 
 ggplot() +
-   geom_sf(data = terrainproperties, aes(fill =LITHOLOGY)) +
-   theme_minimal() +
-   ggtitle("terrainproperties") +
-   scale_fill_viridis_d() +
+  geom_sf(data = terrainproperties, aes(fill =LITHOLOGY)) +
+  theme_minimal() +
+  ggtitle("terrainproperties") +
+  scale_fill_viridis_d() +
   theme(legend.position = "bottom")
 
-
-##‘GADM’ returns the global administrative boundaries- use to get za/ec(study area)
-iso3 <- geodata::country_codes()
-
-iso3 %>%
-  as.data.frame() %>%
-  filter(NAME == "South Africa")
-
-za=getData('GADM', country='ZAF', level=1)
-plot(za)
-
-##lets check the lower adm boundaries
-za@data
-
-eastern_cape=subset(za,NAME_1=="Eastern Cape")
-plot(eastern_cape)
 
 
 # Now crop the properties to the Eastern Cape region 
@@ -79,11 +336,19 @@ terrainproperties_cropped <- st_crop(terrainproperties, eastern_cape)
 parametersestimates_cropped <- st_crop(parametersestimates, eastern_cape)
 soterunitcomposition_cropped <- st_crop(soterunitcomposition,eastern_cape)
 
+
+
+for (dataset in list(terrainproperties_cropped,parametersestimates_cropped,soterunitcomposition_cropped)) {
+  str(dataset)
+  print(head(dataset, n = 5))
+  print(summary(dataset)) 
+}
+
 #  plot the cropped terrainproperties and parameterestimates
 ggplot() +
   geom_sf(data = terrainproperties_cropped, aes(fill = SOILS)) +
   theme_minimal() +
-  ggtitle("Terrain Properties - Eastern Cape") +
+  ggtitle("Terrain Properties - Eastern Cape soils") +
   scale_fill_viridis_d() +
   theme(legend.position = "bottom")
 
@@ -94,7 +359,21 @@ ggplot() +
   scale_fill_viridis_c() +
   theme(legend.position = "bottom")
 
+ggplot() +
+  geom_sf(data = parametersestimates_cropped, aes(fill =BULK)) +
+  theme_minimal() +
+  ggtitle("Parameters Estimates-Eastern Cape") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom")
 
+ggplot() +
+  geom_sf(data = parametersestimates_cropped, aes(fill =TOTN)) +
+  theme_minimal() +
+  ggtitle("Parameters Estimates-total nitrogen (g kg-1)") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "bottom")
+
+summary(parametersestimates_cropped$BULK)##
 # Read the shapefiles
 prec_data <- raster("C:\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_prec_2020-2021\\wc2.1_2.5m_prec_2020-01.tif", layer = "south_africa")
 tmax_data <- raster("C:\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmax_2020-2021\\wc2.1_2.5m_tmax_2020-01.tif", layer = "south_africa")
@@ -187,115 +466,19 @@ plot(soc_trend_cropped,main = "Soil Organic Carbon (SOC) Trend",
 
 
 
-ESRIlulc1 <- raster("C:\\Eastern Cape data\\LULC\\35H_20170101-20180101.tif")
-ESRIlulc2 <- raster("C:\\Eastern Cape data\\LULC\\35J_20170101-20180101.tif")
-
-
-ESRIlulc <- resample(ESRIlulc1, ESRIlulc2,  method='bilinear')  # or method='nearest')
-plot(ESRIlulc)
-
-##########################################################################################################
-##eastern cape data (points)
-# Reading the file
-data <- read_excel("C:/workspace/ocs_ec_data.xls")
-str(data)
-ocs_ec<- janitor::clean_names(data)
-View(ocs_ec)
-
-# convert the (x,y)degrees, minutes and seconds into decimal degrees format for computational purposes
-convert_DMS_to_DD <- function(dms_string) {
-  # Trim white spaces
-  dms_string <- trimws(dms_string)
-  
-  # Check if the input string is already in decimal degrees format
-  if (!grepl("’", dms_string)) {
-    # Remove the degree symbol if present
-    dms_string <- gsub("°", "", dms_string)
-    return(as.numeric(dms_string))
-  }
-  
-  # Extract degrees, minutes, and seconds using regular expressions
-  degrees <- as.numeric(gsub("^([0-9]+)°.*", "\\1", dms_string))
-  minutes <- as.numeric(gsub(".*°([0-9]+)’.*", "\\1", dms_string))
-  seconds <- as.numeric(gsub(".*’([0-9.]+)’’.*", "\\1", dms_string))
-  
-  # Convert to decimal degrees
-  decimal_degrees <- degrees + minutes / 60 + seconds / 3600
-  
-  # Check if it's South, which should be negative
-  if (grepl("S", dms_string, ignore.case = TRUE)) {
-    decimal_degrees <- -decimal_degrees
-  }
-  
-  return(decimal_degrees)
-}
-
-# Convert latitude and longitude values to decimal degrees
-ocs_ec <- ocs_ec %>% 
-  mutate(lat_decimal = sapply(lat, convert_DMS_to_DD),
-         long_decimal = sapply(long, convert_DMS_to_DD))
-
-# Show the updated dataframe
-print(ocs_ec)
-
-
-
-
-
+###########################################
 
 
 #####################################
-## monthly precipitation (Pr) from TerraClimate:https://r-spatial.github.io/rgee/
-# Load required libraries
-library(tidyverse)
-library(rgee)
-library(sf)
 
-library(rgee)
-
-# Load shapefile
-south_africa <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\ZAF_adm2.shp")
-eastern_cape <- south_africa[south_africa$NAME_1 == "Eastern Cape", ]
-
-
-# Load ImageCollection and apply transformations
-terraclimate <- ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE") %>%
-  ee$ImageCollection$filterDate("2021-01-01", "2023-01-01") %>%
-  ee$ImageCollection$map(function(img) {
-    img$select(0:11)$rename(sprintf("PP_%02d",1:12)) # Select the first 12 bands and rename
-  }) %>%
-  ee$ImageCollection$toBands() # Convert ImageCollection to Image
-
-# Extract the data
-ee_eastern_cape_rain <- ee_extract(x = terraclimate, y = eastern_cape, sf = FALSE)
-
-# Extract column names for precipitation data
-cols <- grep("^X202", names(ee_eastern_cape_rain), value = TRUE)
-
-ee_eastern_cape_rain %>%
-  pivot_longer(cols = all_of(cols), names_to = "month", values_to = "pr") %>%
-  mutate(month = gsub("PP_", "", month)) %>%
-  ggplot(aes(x = month, y = pr, group = NAME_2, color = pr)) +
-  geom_line(alpha = 0.4) +
-  xlab("Month") +
-  ylab("Precipitation (mm)") +
-  theme_minimal()
 
 
 
 ########################NDVI
-# Load required libraries
-library(magick)
-library(rgee)
-library(sf)
 
 # Initialize Earth Engine
-#ee_Initialize()
+ee_Initialize()
 
-# Load the Eastern Cape shapefile
-mask <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\ZAF_adm2.shp")
-eastern_cape <- mask[mask$NAME_1 == "Eastern Cape", ] %>% sf_as_ee()
-region <- eastern_cape$geometry()$bounds()
 
 # Load and process the MODIS ImageCollection
 col <- ee$ImageCollection('MODIS/006/MOD13A2')$select('NDVI')
@@ -329,20 +512,21 @@ visParams = list(
 )
 
 rgbVis <- comp$map(function(img) {
-  do.call(img$visualize, visParams) %>%
-    ee$Image$clip(eastern_cape)
+  img$visualize(visParams) %>% # Note: Removed do.call
+    ee$Image$clip(clip_geometry = mzimvubu_sp) # Pass mzimvubu as an argument
 })
+
 
 # Define parameters for image export
 imgParams = list(
-  region = region,
+  region = mzimvubu,
   dimensions = 600,
   crs = 'EPSG:3857',
   framesPerSecond = 10
 )
 
 # Create a folder to save the images
-dir.create("ndvi_images")
+#dir.create("ndvi_images")
 
 # Save each image to a file
 i <- 0
@@ -356,3 +540,21 @@ rgbVis$map(function(image) {
 
 ###########################
 
+#############################################
+
+# Read in the covariate rasters
+
+min_temp <- raster("min_temp.tif")
+max_temp <- raster("max_temp.tif")
+rainfall <- raster("rainfall.tif")
+land_use <- raster("land_use.tif")
+
+# Build a raster stack of the covariates
+covariate_stack <- stack(elevation, slope, aspect, min_temp, max_temp, rainfall, land_use)
+
+# Crop the raster stack to the study area extent
+study_area <- st_bbox(mzimvubu)
+covariate_stack_cropped <- crop(covariate_stack, extent(study_area_bbox))
+
+# Use the raster stack for soil carbon modeling
+# ...m
