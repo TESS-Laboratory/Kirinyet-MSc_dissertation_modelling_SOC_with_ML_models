@@ -172,7 +172,7 @@ plot <- ggplot(ocs_ec_sf, aes(x = c_percent, y = BD)) +
 print(plot)
 
 
-#Estimating the total cabon stock 
+#Estimating the organic cabon stock 
 depth = 40 #cm
 ocs_ec_sf$ocs<- ocs_ec_sf$c_percent * ocs_ec_sf$BD * depth  #t/ha seboko et al
 
@@ -259,8 +259,8 @@ bioclim <- stack(file_list)
 # Transform the CRS to match the raster
 mzimvubu <- st_transform(mzimvubu, st_crs(bioclim))
 
-# Now try cropping the raster
-cropped_bioclim <- crop(bioclim, extent(mzimvubu))
+
+cropped_bioclim <- crop(bioclim, extent(mzimvubu)) #crop
 
 layers_to_plot <- c(1, 12, 14, 19)
 par(mfrow = c(2, 2))# Set up a 2x2 plot layout
@@ -288,7 +288,7 @@ aoi_extent <- extent(xmin = 27, xmax = 29, ymin = -31, ymax = -30.1)
 cropped_raster <- crop(merged_raster, aoi_extent)
 
 # Save the cropped raster stack as a file
-writeRaster(cropped_raster, "C:\workspace\Kirinyet-development\Data\covariate"/cropped_lulc_raster.tif, format = "GTiff")
+writeRaster(cropped_raster, "C:\workspace\Kirinyet-development\Data\covariate"//cropped_lulc_raster.tif, format = "GTiff")
 
 ############################################
 
@@ -331,10 +331,10 @@ ggplot() +
 
 
 
-# Now crop the properties to the Eastern Cape region 
-terrainproperties_cropped <- st_crop(terrainproperties, eastern_cape)
-parametersestimates_cropped <- st_crop(parametersestimates, eastern_cape)
-soterunitcomposition_cropped <- st_crop(soterunitcomposition,eastern_cape)
+# Now crop the properties to the mzimvubu
+terrainproperties_cropped <- st_crop(terrainproperties, mzimvubu)
+parametersestimates_cropped <- st_crop(parametersestimates, mzimvubu)
+soterunitcomposition_cropped <- st_crop(soterunitcomposition,mzimvubu)
 
 
 
@@ -348,21 +348,21 @@ for (dataset in list(terrainproperties_cropped,parametersestimates_cropped,soter
 ggplot() +
   geom_sf(data = terrainproperties_cropped, aes(fill = SOILS)) +
   theme_minimal() +
-  ggtitle("Terrain Properties - Eastern Cape soils") +
+  ggtitle("Terrain Properties - Mzimvubu soils") +
   scale_fill_viridis_d() +
   theme(legend.position = "bottom")
 
 ggplot() +
   geom_sf(data = parametersestimates_cropped, aes(fill = TOTC)) +
   theme_minimal() +
-  ggtitle("Parameter Estimates - Eastern Cape") +
+  ggtitle("Parameter Estimates - Mzimvubu") +
   scale_fill_viridis_c() +
   theme(legend.position = "bottom")
 
 ggplot() +
   geom_sf(data = parametersestimates_cropped, aes(fill =BULK)) +
   theme_minimal() +
-  ggtitle("Parameters Estimates-Eastern Cape") +
+  ggtitle("Parameters Estimates-Mzimvubu") +
   scale_fill_viridis_c() +
   theme(legend.position = "bottom")
 
@@ -405,7 +405,7 @@ tmin_files_2020 <- paste0("C:\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmin_2020
 # Load and crop each raster file
 tmin_list_2020 <- lapply(tmin_files_2020, function(file) {
   raster <- raster(file)
-  raster_cropped <- crop(raster, extent(eastern_cape))
+  raster_cropped <- crop(raster, extent(Mzimvubu))
   return(raster_cropped)
 })
 
@@ -447,7 +447,7 @@ soc_mean_4 <- raster("C:\\Eastern Cape data\\SOC_sa\\SOC_mean_30m_4.tif")
 
 # Merge the two raster files
 merged_raster <- merge(soc_mean_1, soc_mean_3,soc_mean_2,soc_mean_4)
-soc_cropped<- crop(merged_raster,extent(eastern_cape))
+soc_cropped<- crop(merged_raster,extent(mzimvubu))
 
 # Plot the merged raster file
 plot(soc_cropped, main = "SOC Mean annual SOC(kg C m-2) predictions between 1984 and 2019", 
@@ -459,7 +459,7 @@ soc_trend_3 <- raster("C:\\Eastern Cape data\\SOC_sa\\SOC_trend_30m_1.tif")
 soc_trend_4 <- raster("C:\\Eastern Cape data\\SOC_sa\\SOC_trend_30m_2.tif")
 
 merged_raster_trend <- merge(soc_trend_1, soc_trend_2, soc_trend_3, soc_trend_4)
-soc_trend_cropped <- crop(merged_raster_trend,extent(eastern_cape))
+soc_trend_cropped <- crop(merged_raster_trend,extent(mzimvubu))
 
 plot(soc_trend_cropped,main = "Soil Organic Carbon (SOC) Trend", 
      xlab = "Longitude", ylab = "Latitude")
