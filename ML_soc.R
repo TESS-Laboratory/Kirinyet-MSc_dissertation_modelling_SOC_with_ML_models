@@ -23,13 +23,12 @@ library(elevatr)
 library(RColorBrewer)
 library(leaflet)
 library(gstat)
-
-
-
+library(rstac)
+library(gdalcubes)
 
 ##########################################################
 # Read the shapefile of study area
-mzimvubu <- st_read("C:\\Eastern Cape data\\ZAF_adm (1)\\mzimvubu.shp")
+mzimvubu <- st_read("C:\\workspace\\Kirinyet-development\\Data\\mzimvubu.shp")
 plot(mzimvubu, main="Mzimvubu")
 
 # Reading the data points file
@@ -172,7 +171,7 @@ plot <- ggplot(ocs_ec_sf, aes(x = c_percent, y = BD)) +
 print(plot)
 
 
-#Estimating the total cabon stock 
+#Estimating the soil organic cabon stock 
 depth = 40 #cm
 ocs_ec_sf$ocs<- ocs_ec_sf$c_percent * ocs_ec_sf$BD * depth  #t/ha seboko et al
 
@@ -189,18 +188,24 @@ ggplot() +
   theme_minimal() 
 
 
-##################################
+#
+
+
+#################################
 #Elevation data and slope #https://rpubs.com/ials2un/boyaca_dem
-head(mzimvubu)
 mzimvubu_sf <- mzimvubu_sf[!st_is_empty(mzimvubu_sf),]
-elevation <- get_elev_raster(mzimvubu_sf,z=10)
+elevation <- get_elev_raster(mzimvubu_sf,z=10,src = "aws")
 elevation
 
+target_crs <- st_crs(mzimvubu_sf)$proj4string
+
+# Reproject the elevation data to the CRS of the study area
+elevation <- projectRaster(elevation, crs = target_crs)
+
 mzimvubu_sp <- as(mzimvubu_sf, "Spatial")
-plot(elevation, main=" DEM [meters]")
+plot(elevation, main=" DEM (meters)")
 plot(mzimvubu_sp,col="NA",border="black", add=TRUE)
-text(coordinates(mzimvubu_sp), labels=as.character(mzimvubu_sf$MPIO_CNMBR), 
-     col="black", cex=0.20)
+
 
 hist(elevation)
 
@@ -208,14 +213,19 @@ slope = terrain(elevation,opt='slope', unit='degrees')
 aspect = terrain(elevation,opt='aspect',unit='degrees')
 
 #Plot slope
-plot(slope,main="Slope for mzimvubu [degrees]", col=topo.colors(6,alpha=0.6))
+plot(slope,main="Slope for mzimvubu (degrees)", col=topo.colors(6,alpha=0.6))
 plot(mzimvubu, add=TRUE,col="NA",border="black", lwd=0.5)
-text(coordinates(mzimvubu_rep), labels=as.character(mzimvubu_rep$MPIO_CNMBR), cex=0.2)
 
-#Plot aspect.
-plot(aspect,main="Aspect for mzimvubu [degrees]", col=rainbow(10,alpha=0.7))
-plot(mzimvubu, add=TRUE,col="NA",border="black", lwd=0.5)
-text(coordinates(mzimvubu_rep), labels=as.character(mzimvubu_rep$MPIO_CNMBR), cex=0.2)
+
+# Calculate Topographic Wetness Index (TWI)
+slope_radians <- terrain(elevation, opt = "slope", unit = "radians")
+area <- terrain(elevation, opt = "TPI")
+area <- exp(area)
+twi <- log(area / tan(slope_radians))
+
+# Plot Topographic Wetness Index
+plot(twi, main="Topographic Wetness Index for mzimvubu", col=topo.colors(6, alpha=0.6))
+plot(mzimvubu_sp, add=TRUE, col="NA", border="black", lwd=0.5)
 
 
 #interactive mapping
@@ -225,18 +235,20 @@ leaflet() %>%
              popup = "The view from here is amazing!") %>% 
   addProviderTiles("Esri.WorldImagery") 
 
-library(leaflet)
 
 ## Color ramps
 pal1 <- colorNumeric("YlGnBu", domain = ocs_ec_sf$c_percent)
 pal2 <- colorNumeric("YlOrBr", domain = values(elevation), na.color = "transparent")
 
-# Create interactive map
+
+# Reduce the resolution of the raster
+elevation_resampled <- aggregate(elevation, fact=5) # change factor based on the size 
+
 leaflet() %>%
   # Add raster layer for elevation
   addProviderTiles("Esri.WorldImagery") %>%
-  addRasterImage(elevation, colors = pal2, opacity = 0.7) %>%
-  addLegend("topright", opacity = 0.8, pal = pal2, values = values(elevation), 
+  addRasterImage(elevation_resampled, colors = pal2, opacity = 0.7) %>%
+  addLegend("topright", opacity = 0.8, pal = pal2, values = values(elevation_resampled),
             title = "Elevation") %>%
   # Add points for Soil Organic Carbon
   addCircleMarkers(data = ocs_ec_sf, color = ~pal1(c_percent),
@@ -245,10 +257,9 @@ leaflet() %>%
             title = "Soil Organic Carbon (%)", opacity = 0.8)
 
 
-
 ############################
 
-dir_path <- "C:/workspace/Kirinyet-development/Data/covariate/wc2-5/bio_2-5m_bil"
+dir_path <- "C:\\workspace\\covariate\\wc2-5\\bio_2-5m_bil"
 
 # List all the .bil files in the directory
 file_list <- list.files(path = dir_path, pattern = "\\.bil$", full.names = TRUE)
@@ -260,18 +271,40 @@ bioclim <- stack(file_list)
 mzimvubu <- st_transform(mzimvubu, st_crs(bioclim))
 
 # Now try cropping the raster
-cropped_bioclim <- crop(bioclim, extent(mzimvubu))
+ cropped_bioclim <- crop(bioclim, extent(mzimvubu))
 
 layers_to_plot <- c(1, 12, 14, 19)
-par(mfrow = c(2, 2))# Set up a 2x2 plot layout
+par(mfrow = c(2,2))# Set up a 2x2 plot layout
 
 for (i in layers_to_plot) {
   plot(cropped_bioclim[[i]])
 }
 
+################################
+library(MODIStsp)
+MODIStsp_get_prodlayers("M*D13Q1")
 
+# Create necessary folders
+if (!dir.exists("VegetationData")) {
+  dir.create("VegetationData")
+}
 
+spatial_filepath <- "C:\\workspace\\Kirinyet-development\\Data\\mzimvubu.shp"
 
+# Use MODIStsp() function to download the data
+MODIStsp(
+  gui = FALSE,
+  out_folder = "VegetationData",
+  out_folder_mod = "VegetationData",
+  selprod = "Vegetation_Indexes_16Days_1Km (M*D13A2)",
+  bandsel = "NDVI",
+  start_date = "2022.01.01",
+  end_date = "2020.12.31",
+  verbose = FALSE,
+  spatmeth = "file",
+  spafile = spatial_filepath,
+  out_format = "GTiff"
+)
 
 ###################################LULC
 # Import raster layers
@@ -332,9 +365,9 @@ ggplot() +
 
 
 # Now crop the properties to the Eastern Cape region 
-terrainproperties_cropped <- st_crop(terrainproperties, eastern_cape)
-parametersestimates_cropped <- st_crop(parametersestimates, eastern_cape)
-soterunitcomposition_cropped <- st_crop(soterunitcomposition,eastern_cape)
+terrainproperties_cropped <- st_crop(terrainproperties, Mzimvubu)
+parametersestimates_cropped <- st_crop(parametersestimates, Mzimvubu)
+soterunitcomposition_cropped <- st_crop(soterunitcomposition,Mzimvubu)
 
 
 
@@ -386,7 +419,7 @@ prec_files_2020 <- paste0("C:\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_prec_2020
 # Load and crop each raster file
 prec_list_2020 <- lapply(prec_files_2020, function(file) {
   raster <- raster(file)
-  raster_cropped <- crop(raster, extent(eastern_cape))
+  raster_cropped <- crop(raster, extent(Mzimvubu))
   return(raster_cropped)
 })
 
@@ -405,7 +438,7 @@ tmin_files_2020 <- paste0("C:\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmin_2020
 # Load and crop each raster file
 tmin_list_2020 <- lapply(tmin_files_2020, function(file) {
   raster <- raster(file)
-  raster_cropped <- crop(raster, extent(eastern_cape))
+  raster_cropped <- crop(raster, extent(Mzimvubu))
   return(raster_cropped)
 })
 
@@ -423,7 +456,7 @@ tmax_files_2020 <- paste0("C:\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmax_2020
 # Load and crop each raster file
 tmax_list_2020 <- lapply(tmax_files_2020, function(file) {
   raster <- raster(file)
-  raster_cropped <- crop(raster, extent(eastern_cape))
+  raster_cropped <- crop(raster, extent(Mzimvubu))
   return(raster_cropped)
 })
 
@@ -447,7 +480,7 @@ soc_mean_4 <- raster("C:\\Eastern Cape data\\SOC_sa\\SOC_mean_30m_4.tif")
 
 # Merge the two raster files
 merged_raster <- merge(soc_mean_1, soc_mean_3,soc_mean_2,soc_mean_4)
-soc_cropped<- crop(merged_raster,extent(eastern_cape))
+soc_cropped<- crop(merged_raster,extent(Mzimvubu))
 
 # Plot the merged raster file
 plot(soc_cropped, main = "SOC Mean annual SOC(kg C m-2) predictions between 1984 and 2019", 
@@ -459,7 +492,7 @@ soc_trend_3 <- raster("C:\\Eastern Cape data\\SOC_sa\\SOC_trend_30m_1.tif")
 soc_trend_4 <- raster("C:\\Eastern Cape data\\SOC_sa\\SOC_trend_30m_2.tif")
 
 merged_raster_trend <- merge(soc_trend_1, soc_trend_2, soc_trend_3, soc_trend_4)
-soc_trend_cropped <- crop(merged_raster_trend,extent(eastern_cape))
+soc_trend_cropped <- crop(merged_raster_trend,extent(Mzimvubu))
 
 plot(soc_trend_cropped,main = "Soil Organic Carbon (SOC) Trend", 
      xlab = "Longitude", ylab = "Latitude")
@@ -469,7 +502,7 @@ plot(soc_trend_cropped,main = "Soil Organic Carbon (SOC) Trend",
 ###########################################
 
 
-#####################################
+
 
 
 
@@ -554,7 +587,7 @@ covariate_stack <- stack(elevation, slope, aspect, min_temp, max_temp, rainfall,
 
 # Crop the raster stack to the study area extent
 study_area <- st_bbox(mzimvubu)
-covariate_stack_cropped <- crop(covariate_stack, extent(study_area_bbox))
+covariate_stack_cropped <- crop(covariate_stack, extent(study_area))
 
 # Use the raster stack for soil carbon modeling
 # ...m
