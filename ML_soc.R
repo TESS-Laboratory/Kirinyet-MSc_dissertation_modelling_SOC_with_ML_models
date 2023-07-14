@@ -5,7 +5,6 @@ library (caret)
 library (randomForest)
 library(sp)
 library(rgeos)
-library(gganimate)
 library(ncdf4)
 library(mlr3verse)
 library(terra)
@@ -22,10 +21,9 @@ library(gdalcubes)
 library(tidyverse)
 library(MODIStsp)
 library(viridis)
-library(viridis)
 library(rgee)
 
-# Read the shapefile of the administrative boundaries
+# Read the shapefile of the study area and other related data
 inpath<-"C:\\workspace\\Kirinyet-development\\data\\CSA_Baseline_SOC\\"
 CAA<-st_read(paste0(inpath,"Milcah\\CSA_Conservation_Agreement_Areas.shp"))
 CSA_NL <-st_read(paste0(inpath, "Milcah\\CSA_NAtional_Landscapes.shp"))
@@ -99,7 +97,7 @@ ocs_ec_sf <- st_as_sf(ocs_ec_df)
 st_crs(mzimvubu_sf) <- 4326
 st_crs(ocs_ec_sf) <- 4326
 
-
+plot(density(ocs_ec_sf$soc_tha))#check the density distribution
 # Visualize the data - C_percent scaled by 10 (g/kg)
 data_points <- ggplot() +
   geom_sf(data = mzimvubu_sf, fill = "lightgray") +
@@ -180,8 +178,10 @@ ggplot() +
        y = "Latitude") +
   theme_minimal()
 
+
+#Covariates
 #### Elevation,Apect,TWI,Slope ####
-#Elevation data and slope #https://cran.r-project.org/web/packages/elevatr/vignettes/introduction_to_elevatr.html
+#https://cran.r-project.org/web/packages/elevatr/vignettes/introduction_to_elevatr.html
 
 mzimvubu_sp <- mzimvubu_sf[!st_is_empty(mzimvubu_sf$geometry),]#remove empty geometries
 elevation <- elevatr::get_elev_raster(locations = mzimvubu_sp, z = 10)
@@ -237,7 +237,7 @@ leaflet() %>%
             title = "Soil Organic Carbon (%)", opacity = 0.8)
 
 
-#### Bioclim ####
+#### Bioclim #### long term averages 1970-2000
 inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
 bioclim_path <- file.path(inpath_onedrive, "covariate", "wc2-5", "bio_2-5m_bil")
 file_list <- list.files(path = bioclim_path, pattern = "\\.bil$", full.names = TRUE)#list datafiles
@@ -256,16 +256,29 @@ for (i in layers_to_plot) {
 
 
 #### LULC ####
+dir <- "C:/Users/milcah/OneDrive/EC_project/Eastern Cape data/LULC"
 
-# Load the .tif files as raster objects using 
-file_path1 <- file.path(inpath, "LULC", "35J_20220101-20230101.tif")
-file_path2 <- file.path(inpath, "LULC", "35H_20220101-20230101.tif")
-ESRIlulc1 <- raster(file_path1)
-ESRIlulc2 <- raster(file_path2)
+raster_list_J <- list()
 
+for (year in 2017:2022) {
+  # Create file path
+  prefix <- "35J"
+  start_date <- as.Date(paste(year, "-01-01", sep=""))
+  end_date <- as.Date(paste(year + 1, "-01-01", sep=""))
+  file_path <- file.path(dir, paste(prefix, "_", format(start_date, "%Y%m%d"), "-", format(end_date, "%Y%m%d"), ".tif", sep=""))
+  
+  # Load the TIFF file
+  raster_layer <- rast(file_path)
+  print(paste("Loaded", file_path))
+  
+  raster_list_J <- c(raster_list_J, list(raster_layer))
+}
 
+stacked_rasters_J <- do.call(c, raster_list_J)
 
+plot(stacked_rasters_J, main="Stacked Rasters J")
 
+    
 #### ISRIC legacy maps ####
 # Load each shapefile Using SF package
 
@@ -418,15 +431,6 @@ ZA_soter<- st_read("C:\\Eastern Cape data\\ZA-SOTER\\SOTER_ZA\\GIS\\SOTER\\ZA_SO
 print(names(ZA_soter))
 
 
-####mean SOC \(Venter et al 2021)####
-
-file_path <- paste0(inpath_onedrive, "\\SOC_sa\\SOC_mean_30m_1.tif")
-raster_layer <- raster::raster(file_path)
-cropped_layer <- raster::crop(raster_layer, mzimvubu)
-plot(cropped_layer,main = "Soil Organic Carbon (SOC) Trend", 
-     xlab = "Longitude", ylab = "Latitude")
-
-
 #### NDVI/EVI ####
 #https://cran.r-project.org/web/packages/MODIStsp/vignettes/MODIStsp.html
 mzimvubu_extent <- raster::extent(mzimvubu)
@@ -458,25 +462,49 @@ MODIStsp(
 )
 
 
+# Reading in the downloaded NDVI raster data
+NDVI_raster <- raster(here::here("C:\\workspace\\Kirinyet-development\\ndvi_images\\VI_16Days_1Km_v6\\NDVI\\MYD13A2_NDVI_2022_361.tif"))
 
+NDVI_raster <- projectRaster(NDVI_raster, crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")# Transforming the data
 
+NDVI_raster <- raster::mask(NDVI_raster, mzimvubu_sf)
+
+# Dividing values by 10000 to have NDVI values between -1 and 1
+gain(NDVI_raster) <- 0.0001
+
+# Converting the raster object into a dataframe
+NDVI_df <- as.data.frame(NDVI_raster, xy = TRUE, na.rm = TRUE)
+rownames(NDVI_df) <- c()
+
+# Visualising using ggplot2
+ggplot() +
+  geom_raster(
+    data = NDVI_df,
+    aes(x = x, y = y, fill = MYD13A2_NDVI_2022_361)
+  ) +
+  geom_sf(data = mzimvubu_sf, inherit.aes = FALSE, fill = NA) +
+  scale_fill_viridis(name = "NDVI") +
+  labs(
+    title = "NDVI (Normalized Difference Vegetation Index) in Mzimvubu",
+    subtitle = "01-01-2022",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal()
 ###########################
-
-#############################################
-
-# Read in the covariate rasters
-
-min_temp <- raster("min_temp.tif")
-max_temp <- raster("max_temp.tif")
-rainfall <- raster("rainfall.tif")
-land_use <- raster("land_use.tif")
 
 # Build a raster stack of the covariates
 covariate_stack <- stack(elevation, slope, aspect, min_temp, max_temp, rainfall, land_use)
 
-# Crop the raster stack to the study area extent
-study_area <- st_bbox(mzimvubu)
-covariate_stack_cropped <- crop(covariate_stack, extent(study_area))
-
-# Use the raster stack for soil carbon modeling
+# Use the raster stack for modelling with point data 
 # ...m
+
+
+####mean SOC \(Venter et al 2021)####
+
+file_path <- paste0(inpath_onedrive, "\\SOC_sa\\SOC_mean_30m_1.tif")
+raster_layer <- raster::raster(file_path)
+cropped_layer <- raster::crop(raster_layer, mzimvubu)
+plot(cropped_layer,main = "Soil Organic Carbon (SOC) Trend", 
+     xlab = "Longitude", ylab = "Latitude")
+
