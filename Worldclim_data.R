@@ -2,7 +2,7 @@ library(raster)
 library(sp)
 library(tidyverse)
 library(viridis)
-
+library(sf)
 # Read the shapefile of the study area and other related data
 inpath<-"C:\\workspace\\Kirinyet-development\\data\\CSA_Baseline_SOC\\"
 CAA<-st_read(paste0(inpath,"Milcah\\CSA_Conservation_Agreement_Areas.shp"))
@@ -14,84 +14,135 @@ plot(mzimvubu["Name"], main= "Mzimvubu")
 
 mzimvubu_sf <- as(mzimvubu, "sf")
 
-#### temp and rainfall ####
-inpath_prec <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_prec_2020-2021"
 
-# Generate a list of file names for the 24 files
-file_names <- paste(inpath_prec, "\\wc2.1_2.5m_prec_", 
-                    c(paste("2020", sprintf("-%02d", 1:12), sep=""), 
-                      paste("2021", sprintf("-%02d", 1:12), sep="")), ".tif", sep="")
-
-
-raster_list <- list() # Create an empty raster stack
-
-# crop them using the mzimvubu 
-for(file in file_names){
-  raster_layer <- raster::raster(file)
-  cropped_layer <- raster::crop(raster_layer, mzimvubu)
-  raster_list <- c(raster_list, list(cropped_layer))
-}
-
-
-raster_stack <- raster::stack(raster_list) # Stack the cropped rasters
-
-plot(raster_stack, 1:4)
-
-
-####
-inpath_tmax<- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmax_2020-2021"
-
-file_names <- paste(inpath_tmax, "\\wc2.1_2.5m_tmax_", 
-                    c(paste("2020", sprintf("-%02d", 1:12), sep=""), 
-                      paste("2021", sprintf("-%02d", 1:12), sep="")), ".tif", sep="")
-
-raster_list <- list()
-
-# Loop through the file names, crop them using the mzimvubu polygon, and add them to the list
-for(file in file_names){
-  raster_layer <- raster::raster(file)
-  cropped_layer <- raster::crop(raster_layer, mzimvubu)
-  raster_list <- c(raster_list, list(cropped_layer))
-}
-
-
-raster_stack <- raster::stack(raster_list) # Stack the cropped rasters
-
-plot(raster_stack, 1:4)
-
-
-####
-inpath_tmin <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmin_2020-2021"
-
-file_names <- paste(inpath_tmin, "\\wc2.1_2.5m_tmin_", 
-                    c(paste("2020", sprintf("-%02d", 1:12), sep=""), 
-                      paste("2021", sprintf("-%02d", 1:12), sep="")), ".tif", sep="")
-
-raster_list <- list()
-
-for(file in file_names){
-  raster_layer <- raster::raster(file)
-  cropped_layer <- raster::crop(raster_layer, mzimvubu_sf)
-  raster_list <- c(raster_list, list(cropped_layer))
-}
-
-raster_stack <- raster::stack(raster_list)
-
-plot(raster_stack, 1:4)
-
-#### Bioclim #### long term averages 1970-2000
+#### Bioclim #### 
 inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
-bioclim_path <- file.path(inpath_onedrive, "covariate", "wc2-5", "bio_2-5m_bil")
-file_list <- list.files(path = bioclim_path, pattern = "\\.bil$", full.names = TRUE)#list datafiles
-bioclim <- stack(file_list)
+bioclim_path <- file.path(inpath_onedrive, "covariate", "wc2.1_30s_bio")
+file_list <- list.files(path = bioclim_path, pattern = "\\.tif$", full.names = TRUE)
+cropped_rasters <- list()
 
-# Crop the raster
-mzimvubu_spatial <- as(mzimvubu_sp, "Spatial")
-bioclim_cropped <- raster::crop(bioclim, mzimvubu_spatial)
+# crop raster
+for(i in 1:length(file_list)) {
+  r <- raster(file_list[i])
+  r_cropped <- crop(r, extent(mzimvubu_sf))
+  r_masked <- mask(r_cropped, mzimvubu_sf)
+  cropped_rasters[[i]] <- r_masked
+}
 
-layers_to_plot <- c(1, 12, 14, 19) #select variable
-par(mfrow = c(2, 2)) # Set up a 2x2 plot layout
 
+bioclim_cropped <- stack(cropped_rasters)
+output_folder <- "C:\\workspace\\covariate\\"
+
+# Loop through each layer in the stack
+for(i in 1:nlayers(bioclim_cropped)) {
+  layer <- bioclim_cropped[[i]]
+  output_filename <- file.path(output_folder, paste0("Bioclim_data_", i, ".tif"))# Specify output filename
+  writeRaster(layer, filename = output_filename, format = "GTiff")# Write the layer to a file
+}
+
+# Plotting
+layers_to_plot <- 1:nlayers(bioclim_cropped) #plot all layers
+n_row <- ceiling(sqrt(length(layers_to_plot)))
+n_col <- ceiling(length(layers_to_plot) / n_row)
+
+# Adjust margins
+par(mfrow = c(n_row, n_col), mar = c(2, 2, 2, 2))
+
+# Plotting each layer
 for (i in layers_to_plot) {
-  plot(bioclim_cropped[[i]], main = names(bioclim)[i])
+  plot(bioclim_cropped[[i]], main = names(bioclim_cropped)[i])
+}
+
+
+#### temp and rainfall ####
+#monthly precipitation
+prec_path <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\covariate\\wc2.1_30s_prec"
+output_folder <- "C:\\workspace\\covariate\\prec"
+file_list <- list.files(path = prec_path, pattern = "\\.tif$", full.names = TRUE)
+
+cropped_rasters <- list()
+
+# Loop through each file in the list, crop and mask the raster
+for(i in 1:length(file_list)) {
+  r <- raster(file_list[i])
+  r_cropped <- crop(r, extent(mzimvubu_sf))
+  r_masked <- mask(r_cropped, mzimvubu_sf)
+  
+  output_filename <- file.path(output_folder, paste0("prec_", basename(file_list[i])))
+  writeRaster(r_masked, filename = output_filename, format = "GTiff")
+  
+  # Add to the list of cropped rasters
+  cropped_rasters[[i]] <- r_masked
+}
+
+
+stacked_rasters <- stack(cropped_rasters)
+brick_rasters <- brick(stacked_rasters)
+writeRaster(brick_rasters, filename = file.path(output_folder, "Stacked_prec_rasters.tif"), format = "GTiff")
+
+# Plot each layer in the brick
+for(i in 1:nlayers(brick_rasters)) {
+  plot(brick_rasters[[i]], main = paste("Layer", i))
+}
+
+
+# Maximum temperature
+tmax_path <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\covariate\\wc2.1_30s_tmax"
+output_folder <- "C:\\workspace\\covariate\\tmax"
+file_list <- list.files(path = tmax_path, pattern = "\\.tif$", full.names = TRUE)
+
+cropped_rasters <- list()
+
+#  crop and mask each raster
+for(i in 1:length(file_list)) {
+  r <- raster(file_list[i])
+  r_cropped <- crop(r, extent(mzimvubu_sf))
+  r_masked <- mask(r_cropped, mzimvubu_sf)
+  
+  # Save the masked and cropped raster to file
+  output_filename <- file.path(output_folder, paste0("tmax_", basename(file_list[i])))
+  writeRaster(r_masked, filename = output_filename, format = "GTiff")
+  cropped_rasters[[i]] <- r_masked
+}
+
+# Stack the rasters
+stacked_rasters <- stack(cropped_rasters)
+brick_rasters <- brick(stacked_rasters)
+writeRaster(brick_rasters, filename = file.path(output_folder, "Stacked_tmax_rasters.tif"), format = "GTiff")
+
+# Plot each layer in the brick
+for(i in 1:nlayers(brick_rasters)) {
+  plot(brick_rasters[[i]], main = paste("Layer", i))
+}
+
+
+# Minimum monthly temperature
+tmin_path <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\covariate\\wc2.1_30s_tmin"
+output_folder <- "C:\\workspace\\covariate\\tmin"
+file_list <- list.files(path = tmin_path, pattern = "\\.tif$", full.names = TRUE)
+
+cropped_rasters <- list()
+
+# Loop through each file in the list, crop and mask the raster
+for(i in 1:length(file_list)) {
+  r <- raster(file_list[i])
+  r_cropped <- crop(r, extent(mzimvubu_sf))
+  r_masked <- mask(r_cropped, mzimvubu_sf)
+  
+  # Save the masked and cropped raster to file
+  output_filename <- file.path(output_folder, paste0("tmin_", basename(file_list[i])))
+  writeRaster(r_masked, filename = output_filename, format = "GTiff")
+  
+  # Add to the list of cropped rasters
+  cropped_rasters[[i]] <- r_masked
+}
+
+# Stack the rasters
+stacked_rasters <- stack(cropped_rasters)
+brick_rasters <- brick(stacked_rasters)
+writeRaster(brick_rasters, filename = file.path(output_folder, "Stacked_tmin_rasters.tif"), format = "GTiff")
+
+# Plot each layer in the brick
+for(i in 1:nlayers(brick_rasters)) {
+  plot(brick_rasters[[i]], main = paste("Layer", i))
 }

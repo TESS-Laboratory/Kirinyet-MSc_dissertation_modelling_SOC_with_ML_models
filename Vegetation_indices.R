@@ -21,12 +21,6 @@ plot(mzimvubu["Name"], main= "Mzimvubu")
 #https://rspatialdata.github.io/vegetation.html
 #https://cran.r-project.org/web/packages/MODIStsp/vignettes/MODIStsp.html
 
-mzimvubu_extent <- raster::extent(mzimvubu)
-print(mzimvubu_extent)
-extent <- list(xmin = 28.20686, 
-               xmax = 30.19472, 
-               ymin = -31.29833, 
-               ymax = -30.0018)
 mzimvubu_sf <- as(mzimvubu, "sf")
 
 #MODIStsp_get_prodlayers("M*D13A2") #1km resolution
@@ -54,6 +48,7 @@ MODIStsp(
   out_format = "GTiff"
 )
 
+#### NDVI ####
 
 # Reading in the downloaded NDVI raster data
 NDVI_raster <- raster(here::here("C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\NDVI\\MOD13Q1_NDVI_2022_001.tif"))
@@ -83,38 +78,109 @@ ggplot() +
   theme_minimal()
 
 
-#resample the temporal distribution from 16day to annual mean
-# Set file path
-filepath <- "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\NDVI\\"
-file_list <- list.files(path = filepath, pattern = "*.tif$", full.names = TRUE)
+# crop and stack them for further preprocessing
+files <- list.files(path = "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\NDVI\\", pattern = "MOD13Q1_NDVI_.*\\.tif$", full.names = TRUE)
+dir.create("C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_NDVI")
+mzimvubu_extent <- extent(mzimvubu_sf)
 
-# Read and crop each raster file
-raster_list <- map(file_list, ~ {
-  r <- raster(.x)
-  r <- projectRaster(r, crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
-  r <- raster::mask(r, mzimvubu_sf)
-  gain(r) <- 0.0001
-  r
-})
+# Loop over each file
+for(i in seq_along(files)) {
 
-# Stack all rasters
-raster_stack <- stack(raster_list)
-annual_mean_raster <- calc(raster_stack, fun = mean, na.rm = TRUE)# Calculate annual mean raster
+  date <- gsub(pattern = "^.*MOD13Q1_NDVI_(\\d{4}_\\d{3}).*.tif$", replacement = "\\1", x = basename(files[i]))
+  
+  # Reading in the downloaded NDVI raster data
+  NDVI_raster <- raster(files[i])
+  NDVI_raster <- projectRaster(NDVI_raster, crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")# Transforming the data
+  NDVI_raster <- raster::mask(NDVI_raster, mzimvubu_sf)
+  NDVI_raster <- crop(NDVI_raster, mzimvubu_extent) # Crop to mzimvubu_extent
+  gain(NDVI_raster) <- 0.0001 # Dividing values by 10000 to have NDVI values between -1 and 1
+  
+  # Save processed raster file
+  writeRaster(NDVI_raster, filename = paste0("C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_NDVI\\NDVI_", date, ".tif"), format = "GTiff")
+}
+
+# Get list of all processed TIFF files
+processed_files <- list.files(path = "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_NDVI", pattern = "NDVI_.*\\.tif$", full.names = TRUE)
+NDVI_stack <- stack(processed_files)
+mean_annual_NDVI <- mean(NDVI_stack) # Calculate mean annual NDVI
+writeRaster(mean_annual_NDVI, filename = "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_NDVI\\mean_annual_NDVI.tif", format = "GTiff")
 
 
-writeRaster(annual_mean_raster, filename = "annual_mean_raster.tif", format = "GTiff", overwrite = TRUE)# Save the annual mean raster
+# Converting the mean annual NDVI raster into a dataframe
+mean_annual_NDVI_df <- as.data.frame(mean_annual_NDVI, xy = TRUE)
+mean_annual_NDVI_df <- na.omit(mean_annual_NDVI_df)# Removing NA values
 
-# Convert the annual mean raster to a dataframe for visualization
-annual_mean_df <- as.data.frame(annual_mean_raster, xy = TRUE)
-colnames(annual_mean_df) <- c("x", "y", "annual_mean_ndvi")
-
-# Visualize the annual mean raster
+# Plotting the data
 ggplot() +
-  geom_raster(data = annual_mean_df, aes(x = x, y = y, fill = annual_mean_ndvi)) +
-  scale_fill_viridis_c(name = "Annual mean NDVI") +
+  geom_raster(
+    data = mean_annual_NDVI_df,
+    aes(x = x, y = y, fill = layer)  # layer column contains the mean NDVI values
+  ) +
+  geom_sf(data = mzimvubu_sf, inherit.aes = FALSE, fill = NA) +
+  scale_fill_viridis(name = "Mean Annual NDVI") +
   labs(
-    title = "Annual mean NDVI in Mzimvubu",
+    title = "Mean Annual NDVI (2022) in Mzimvubu",
     x = "Longitude",
     y = "Latitude"
   ) +
   theme_minimal()
+
+
+
+#### EVI ####
+
+dir.create("C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_EVI")
+EVI_files <- list.files(path = "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\EVI\\", pattern = "MOD13Q1_EVI_.*\\.tif$", full.names = TRUE)
+
+# Loop over each file
+for(i in seq_along(EVI_files)) {
+  
+  date <- gsub(pattern = "^.*MOD13Q1_EVI_(\\d{4}_\\d{3}).*.tif$", replacement = "\\1", x = basename(EVI_files[i]))
+  
+  # Reading in the downloaded EVI raster data
+  EVI_raster <- raster(EVI_files[i])
+  EVI_raster <- projectRaster(EVI_raster, crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs") # Transforming the data
+  EVI_raster <- raster::mask(EVI_raster, mzimvubu_sf)
+  EVI_raster <- crop(EVI_raster, mzimvubu_extent) # Crop to mzimvubu_extent
+  gain(EVI_raster) <- 0.0001 # Dividing values by 10000 to have EVI values between -1 and 1
+  
+  # Save processed raster file
+  writeRaster(EVI_raster, filename = paste0("C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_EVI\\EVI_", date, ".tif"), format = "GTiff")
+}
+
+# Get list of all processed TIFF files
+processed_EVI_files <- list.files(path = "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_EVI", pattern = "EVI_.*\\.tif$", full.names = TRUE)
+EVI_stack <- stack(processed_EVI_files)
+mean_annual_EVI <- mean(EVI_stack) # Calculate mean annual EVI
+writeRaster(mean_annual_EVI, filename = "C:\\workspace\\Kirinyet-development\\ndvi_images\\South Africa\\VI_16Days_250m_v6\\Processed_EVI\\mean_annual_EVI.tif", format = "GTiff")
+
+
+# Converting the mean annual EVI raster into a dataframe
+mean_annual_EVI_df <- as.data.frame(mean_annual_EVI, xy = TRUE)
+mean_annual_EVI_df <- na.omit(mean_annual_EVI_df) # Removing NA values
+
+# Plotting the data
+ggplot() +
+  geom_raster(
+    data = mean_annual_EVI_df,
+    aes(x = x, y = y, fill = layer)  # layer column contains the mean EVI values
+  ) +
+  geom_sf(data = mzimvubu_sf, inherit.aes = FALSE, fill = NA) +
+  scale_fill_viridis(name = "Mean Annual EVI") +
+  labs(
+    title = "Mean Annual EVI (2022) in Mzimvubu",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal()
+
+
+
+
+
+
+
+# Joining the data
+#df_joined <- df %>%
+ # left_join(mean_annual_NDVI_df, by = c("Longitude" = "x", "Latitude" = "y"), suffix = c("", ".NDVI")) %>%
+  #left_join(mean_annual_EVI_df, by = c("Longitude" = "x", "Latitude" = "y"), suffix = c("", ".EVI"))
