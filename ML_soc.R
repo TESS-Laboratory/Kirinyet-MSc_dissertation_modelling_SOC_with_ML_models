@@ -98,6 +98,7 @@ st_crs(mzimvubu_sf) <- 4326
 st_crs(ocs_ec_sf) <- 4326
 
 plot(density(ocs_ec_sf$soc_tha))#check the density distribution
+
 # Visualize the data - C_percent scaled by 10 (g/kg)
 data_points <- ggplot() +
   geom_sf(data = mzimvubu_sf, fill = "lightgray") +
@@ -110,6 +111,34 @@ data_points <- ggplot() +
 
 # Print the plot
 print(data_points)
+
+#  c_g_kg vs BD
+plot <- ggplot(ocs_ec_sf, aes( x = soilbd,y = c_g_kg)) +
+  geom_point() +  
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "C_g_kg", y = "BD", title = "Relationship between C_g_kg and BD") +
+  theme_minimal()
+
+print(plot)
+
+# c_g_kg vs  ph  
+plot1 <- ggplot(ocs_ec_sf, aes(x = c_g_kg, y = p_h)) +
+  geom_point() +  
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "C_g_kg", y = "pH", title = "Relationship between C_g_kg and pH") +
+  theme_minimal()
+print(plot1)
+
+# Plot the point ocs
+ggplot() +
+  geom_sf(data = mzimvubu_sf, fill = "lightgray") +
+  geom_sf(data = ocs_ec_sf, aes(geometry = geometry, color = soc_tha), size = 4) +
+  scale_color_viridis(name = "OCS (t/ha)") + 
+  labs(title = "Soil Organic Carbon Stock at point",
+       x = "Longitude",
+       y = "Latitude") +
+  theme_minimal()
+
 
 #### interactive maps for datapoints and c_percent ####
 # Extract longitude and latitude from geometry column
@@ -143,142 +172,23 @@ map <- map %>%
 print(map)
 
 
-#### Bulk density estimation and OCS ####
-#estimating bulk density BERNOUX et al.1998/souza et al 2016 #replace with actual dataset
-#ocs_ec_sf$BD <- 1.524 - (0.0046*ocs_ec_sf$clay_percent) - (0.051*ocs_ec_sf$c_percent)- (0.0045*ocs_ec_sf$ph_k_cl) + (0.001*ocs_ec_sf$sand_percent)
+####Covariates####
 
-#  c_g_kg vs BD
-plot <- ggplot(ocs_ec_sf, aes( x = soilbd,y = c_g_kg)) +
-  geom_point() +  
-  geom_smooth(method = "lm", se = FALSE, color = "red") +
-  labs(x = "C_g_kg", y = "BD", title = "Relationship between C_g_kg and BD") +
-  theme_minimal()
+#Soils
 
-print(plot)
+soils<- st_read("C:\\workspace\\mzimvubusoils.shp")
+summary(soils)
+print(soils$DOMSOI)
 
-# c_g_kg vs  ph  
-plot1 <- ggplot(ocs_ec_sf, aes(x = c_g_kg, y = p_h)) +
-  geom_point() +  
-  geom_smooth(method = "lm", se = FALSE, color = "red") +
-  labs(x = "C_g_kg", y = "pH", title = "Relationship between C_g_kg and pH") +
-  theme_minimal()
-print(plot1)
-
-#Estimating the organic carbon stock 
-#depth = 40 #cm
-#ocs_ec_sf$ocs<- ocs_ec_sf$c_percent * ocs_ec_sf$BD * depth  #t/ha seboko et al
-
-# Plot the point ocs
+#  plot
 ggplot() +
-  geom_sf(data = mzimvubu_sf, fill = "lightgray") +
-  geom_sf(data = ocs_ec_sf, aes(geometry = geometry, color = soc_tha), size = 4) +
-  scale_color_viridis(name = "OCS (t/ha)") + 
-  labs(title = "Soil Organic Carbon Stock at point",
-       x = "Longitude",
-       y = "Latitude") +
-  theme_minimal()
+  geom_sf(data = soils, aes(fill = DOMSOI)) + 
+  geom_sf(data = SOC_points, color = "blue") +
+  theme_minimal() +
+  labs(fill = "Dominant Soil")
 
 
-#Covariates
-#### Elevation,Apect,TWI,Slope ####
-#https://cran.r-project.org/web/packages/elevatr/vignettes/introduction_to_elevatr.html
 
-mzimvubu_sp <- mzimvubu_sf[!st_is_empty(mzimvubu_sf$geometry),]#remove empty geometries
-elevation <- elevatr::get_elev_raster(locations = mzimvubu_sp, z = 10)
-plot(elevation, main="DEM (meters)")
-plot(mzimvubu_sp,col="NA",border="black", add = TRUE)
-
-
-slope = terrain(elevation,opt='slope', unit='degrees')
-aspect = terrain(elevation,opt='aspect',unit='degrees')
-
-#Plot slope
-plot(slope,main="Slope for mzimvubu (degrees)", col=topo.colors(6,alpha=0.6))
-plot(mzimvubu_sp, add=TRUE,col="NA",border="black", lwd=0.5)
-
-
-# Calculate Topographic Wetness Index (TWI)
-slope_radians <- terrain(elevation, opt = "slope", unit = "radians")
-area <- terrain(elevation, opt = "TPI")
-area <- exp(area)
-twi <- log(area / tan(slope_radians))
-
-# Plot Topographic Wetness Index
-plot(twi, main="Topographic Wetness Index for mzimvubu", col=topo.colors(6, alpha=0.6))
-plot(mzimvubu_sp, add=TRUE, col="NA", border="black", lwd=0.5)
-
-
-#interactive mapping
-
-leaflet() %>% 
-  addMarkers(lng = 28, lat = -30, 
-             popup = "The view from here is amazing!") %>% 
-  addProviderTiles("Esri.WorldImagery") 
-
-
-## Color ramps
-pal1 <- colorNumeric("YlGnBu", domain = ocs_ec_sf$c_g_kg)
-pal2 <- colorNumeric("YlOrBr", domain = values(elevation), na.color = "transparent")
-
-
-# Reduce the resolution of the raster
-elevation_resampled <- aggregate(elevation, fact=5) # change factor based on the size 
-
-leaflet() %>%
-  # Add raster layer for elevation
-  addProviderTiles("Esri.WorldImagery") %>%
-  addRasterImage(elevation_resampled, colors = pal2, opacity = 0.7) %>%
-  addLegend("topright", opacity = 0.8, pal = pal2, values = values(elevation_resampled),
-            title = "Elevation") %>%
-  # Add points for Soil Organic Carbon
-  addCircleMarkers(data = ocs_ec_sf, color = ~pal1(c_g_kg),
-                   popup = ~sprintf("Soil Organic Carbon: %.2f%%<br>Treatment: %s", c_g_kg, treatment)) %>%
-  addLegend("bottomright", pal = pal1, values = ocs_ec_sf$c_g_kg,
-            title = "Soil Organic Carbon (%)", opacity = 0.8)
-
-
-#### Bioclim #### long term averages 1970-2000
-inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
-bioclim_path <- file.path(inpath_onedrive, "covariate", "wc2-5", "bio_2-5m_bil")
-file_list <- list.files(path = bioclim_path, pattern = "\\.bil$", full.names = TRUE)#list datafiles
-bioclim <- stack(file_list)
-
-# Crop the raster
-mzimvubu_spatial <- as(mzimvubu_sp, "Spatial")
-bioclim_cropped <- raster::crop(bioclim, mzimvubu_spatial)
-
-layers_to_plot <- c(1, 12, 14, 19) #select variable
-par(mfrow = c(2, 2)) # Set up a 2x2 plot layout
-
-for (i in layers_to_plot) {
-  plot(bioclim_cropped[[i]], main = names(bioclim)[i])
-}
-
-
-#### LULC ####
-dir <- "C:/Users/milcah/OneDrive/EC_project/Eastern Cape data/LULC"
-
-raster_list_J <- list()
-
-for (year in 2017:2022) {
-  # Create file path
-  prefix <- "35J"
-  start_date <- as.Date(paste(year, "-01-01", sep=""))
-  end_date <- as.Date(paste(year + 1, "-01-01", sep=""))
-  file_path <- file.path(dir, paste(prefix, "_", format(start_date, "%Y%m%d"), "-", format(end_date, "%Y%m%d"), ".tif", sep=""))
-  
-  # Load the TIFF file
-  raster_layer <- rast(file_path)
-  print(paste("Loaded", file_path))
-  
-  raster_list_J <- c(raster_list_J, list(raster_layer))
-}
-
-stacked_rasters_J <- do.call(c, raster_list_J)
-
-plot(stacked_rasters_J, main="Stacked Rasters J")
-
-    
 #### ISRIC legacy maps ####
 # Load each shapefile Using SF package
 
@@ -317,7 +227,7 @@ ggplot() +
   scale_fill_viridis_d() +
   theme(legend.position = "bottom")
 
-# Now crop the properties to the Eastern Cape region 
+# Now crop the properties to the mzimvubu region 
 terrainproperties_cropped <- st_crop(terrainproperties, mzimvubu)
 parametersestimates_cropped <- st_crop(parametersestimates, mzimvubu)
 soterunitcomposition_cropped <- st_crop(soterunitcomposition,mzimvubu)
@@ -361,136 +271,6 @@ ggplot() +
 summary(parametersestimates_cropped$BULK) ## compare to estimated bulk density
 
 
-#### temp and rainfall ####
-inpath_prec <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_prec_2020-2021"
-
-# Generate a list of file names for the 24 files
-file_names <- paste(inpath_prec, "\\wc2.1_2.5m_prec_", 
-                    c(paste("2020", sprintf("-%02d", 1:12), sep=""), 
-                      paste("2021", sprintf("-%02d", 1:12), sep="")), ".tif", sep="")
-
-
-raster_list <- list() # Create an empty raster stack
-
-# crop them using the mzimvubu 
-for(file in file_names){
-  raster_layer <- raster::raster(file)
-  cropped_layer <- raster::crop(raster_layer, mzimvubu)
-  raster_list <- c(raster_list, list(cropped_layer))
-}
-
-
-raster_stack <- raster::stack(raster_list) # Stack the cropped rasters
-
-plot(raster_stack, 1:4)
-
-
-####
-inpath_tmax<- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmax_2020-2021"
-
-file_names <- paste(inpath_tmax, "\\wc2.1_2.5m_tmax_", 
-                    c(paste("2020", sprintf("-%02d", 1:12), sep=""), 
-                      paste("2021", sprintf("-%02d", 1:12), sep="")), ".tif", sep="")
-
-raster_list <- list()
-
-# Loop through the file names, crop them using the mzimvubu polygon, and add them to the list
-for(file in file_names){
-  raster_layer <- raster::raster(file)
-  cropped_layer <- raster::crop(raster_layer, mzimvubu)
-  raster_list <- c(raster_list, list(cropped_layer))
-}
-
-
-raster_stack <- raster::stack(raster_list) # Stack the cropped rasters
-
-plot(raster_stack, 1:4)
-
-
-####
-inpath_tmin <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\wc2.1_cruts4.06_2.5m_tmin_2020-2021"
-
-file_names <- paste(inpath_tmin, "\\wc2.1_2.5m_tmin_", 
-                    c(paste("2020", sprintf("-%02d", 1:12), sep=""), 
-                      paste("2021", sprintf("-%02d", 1:12), sep="")), ".tif", sep="")
-
-raster_list <- list()
-
-for(file in file_names){
-  raster_layer <- raster::raster(file)
-  cropped_layer <- raster::crop(raster_layer, mzimvubu)
-  raster_list <- c(raster_list, list(cropped_layer))
-}
-
-raster_stack <- raster::stack(raster_list)
-
-plot(raster_stack, 1:4)
-
-
-ZA_soter<- st_read("C:\\Eastern Cape data\\ZA-SOTER\\SOTER_ZA\\GIS\\SOTER\\ZA_SOTERv1.shp")
-print(names(ZA_soter))
-
-
-#### NDVI/EVI ####
-#https://cran.r-project.org/web/packages/MODIStsp/vignettes/MODIStsp.html
-mzimvubu_extent <- raster::extent(mzimvubu)
-print(mzimvubu_extent)
-
-MODIStsp_get_prodlayers("M*D13A2")
-
-xmin <- 28.20686 
-xmax <- 30.19472 
-ymin <- -31.29833 
-ymax <- -30.0018
-
-extent <- c(xmin, xmax, ymin, ymax)
-
-# Launch the processing
-MODIStsp(
-  gui              = FALSE,
-  out_folder       = "ndvi_images",
-  start_date       = "2022.01.01",
-  end_date         = "2022.12.31",
-  selprod          = "Vegetation_Indexes_16Days_1Km (M*D13A2)",
-  bandsel          = c("NDVI", "EVI"),
-  extent           = extent,
-  out_proj4        = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
-  user             = "mstp_test",
-  password         = "MSTP_test_01",
-  verbose          = FALSE,
-  parallel         = FALSE
-)
-
-
-# Reading in the downloaded NDVI raster data
-NDVI_raster <- raster(here::here("C:\\workspace\\Kirinyet-development\\ndvi_images\\VI_16Days_1Km_v6\\NDVI\\MYD13A2_NDVI_2022_361.tif"))
-
-NDVI_raster <- projectRaster(NDVI_raster, crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")# Transforming the data
-
-NDVI_raster <- raster::mask(NDVI_raster, mzimvubu_sf)
-
-# Dividing values by 10000 to have NDVI values between -1 and 1
-gain(NDVI_raster) <- 0.0001
-
-# Converting the raster object into a dataframe
-NDVI_df <- as.data.frame(NDVI_raster, xy = TRUE, na.rm = TRUE)
-rownames(NDVI_df) <- c()
-
-# Visualising using ggplot2
-ggplot() +
-  geom_raster(
-    data = NDVI_df,
-    aes(x = x, y = y, fill = MYD13A2_NDVI_2022_361)
-  ) +
-  geom_sf(data = mzimvubu_sf, inherit.aes = FALSE, fill = NA) +
-  scale_fill_viridis(name = "NDVI") +
-  labs(
-    title = "NDVI (Normalized Difference Vegetation Index) in Mzimvubu",
-    subtitle = "01-01-2022",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal()
 ###########################
 
 # Build a raster stack of the covariates

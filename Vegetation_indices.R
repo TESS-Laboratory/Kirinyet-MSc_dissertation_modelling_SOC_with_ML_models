@@ -1,27 +1,17 @@
 library(MODIStsp)
 library(rgeoboundaries)
-library(sf)
 library(raster)
 library(here)
 library(viridis)
+library(rgee)
+library(gdalcubes)
 library(tidyverse)
-
-
 # Read the shapefile of the study area and other related data
-inpath<-"C:\\workspace\\Kirinyet-development\\data\\CSA_Baseline_SOC\\"
-CAA<-st_read(paste0(inpath,"Milcah\\CSA_Conservation_Agreement_Areas.shp"))
-CSA_NL <-st_read(paste0(inpath, "Milcah\\CSA_NAtional_Landscapes.shp"))
-SOC_locations<-st_read(paste0(inpath, "Milcah\\SOC_GPS_Locations.shp"))
-
-mzimvubu <- CSA_NL[CSA_NL$Name == "Mzimvubu Landscape", ] #subset NLA to mzimvubu
-plot(mzimvubu["Name"], main= "Mzimvubu")
-
+mzimvubu_sf <- st_read("C:\\workspace\\Kirinyet-development\\data\\mzimvubu_sf.shp") 
 
 #### NDVI/EVI ####
 #https://rspatialdata.github.io/vegetation.html
 #https://cran.r-project.org/web/packages/MODIStsp/vignettes/MODIStsp.html
-
-mzimvubu_sf <- as(mzimvubu, "sf")
 
 #MODIStsp_get_prodlayers("M*D13A2") #1km resolution
 MODIStsp_get_prodlayers("M*D13Q1") #250m resolution preferred 
@@ -177,10 +167,4 @@ ggplot() +
 
 
 
-
-
-
-# Joining the data
-#df_joined <- df %>%
- # left_join(mean_annual_NDVI_df, by = c("Longitude" = "x", "Latitude" = "y"), suffix = c("", ".NDVI")) %>%
-  #left_join(mean_annual_EVI_df, by = c("Longitude" = "x", "Latitude" = "y"), suffix = c("", ".EVI"))
+#########################################################

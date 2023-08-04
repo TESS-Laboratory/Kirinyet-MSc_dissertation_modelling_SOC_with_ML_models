@@ -3,17 +3,6 @@ library(sp)
 library(tidyverse)
 library(viridis)
 library(sf)
-# Read the shapefile of the study area and other related data
-inpath<-"C:\\workspace\\Kirinyet-development\\data\\CSA_Baseline_SOC\\"
-CAA<-st_read(paste0(inpath,"Milcah\\CSA_Conservation_Agreement_Areas.shp"))
-CSA_NL <-st_read(paste0(inpath, "Milcah\\CSA_NAtional_Landscapes.shp"))
-SOC_locations<-st_read(paste0(inpath, "Milcah\\SOC_GPS_Locations.shp"))
-
-mzimvubu <- CSA_NL[CSA_NL$Name == "Mzimvubu Landscape", ] #subset NLA to mzimvubu
-plot(mzimvubu["Name"], main= "Mzimvubu")
-
-mzimvubu_sf <- as(mzimvubu, "sf")
-
 
 #### Bioclim #### 
 inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
