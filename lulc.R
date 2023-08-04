@@ -1,3 +1,4 @@
+# The data in this script were downloaded from ESRI and preprocessed in QGIS 
 library(terra)
 library(raster)
 
