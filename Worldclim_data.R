@@ -1,3 +1,4 @@
+# This script  details how the climatic dataset was preprocessed
 library(raster)
 library(sp)
 library(tidyverse)
