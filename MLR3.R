@@ -1,3 +1,5 @@
+
+## This script details the fitting of the different learners to predict soil carbon in tha based on the covariates detailed. This is still work in progress
 library(mlr3)
 library(mlr3learners)
 library(mlr3tuning)
@@ -159,6 +161,7 @@ test_set <- setdiff(seq_len(task$nrow), train_set) # the rest 20% of the data
 learner$train(task, row_ids = train_set)#Train the model
 predictions <- learner$predict(task, row_ids = test_set)#Predict on the test set
 print(predictions)
+
 predictions$score(msr("regr.mse"))
 
 mae <- predictions$score(msr("regr.mae"))
@@ -275,8 +278,7 @@ print(importance_matrix)
 
 
 
-######################################
-
+####################################
 ##resample then replace files into above 
 raster_files <- c("C:\\workspace\\covariate\\DEM_covariates\\mean_annual_EVI.tif",
                   "C:\\workspace\\covariate\\DEM_covariates\\mean_annual_NDVI.tif",
