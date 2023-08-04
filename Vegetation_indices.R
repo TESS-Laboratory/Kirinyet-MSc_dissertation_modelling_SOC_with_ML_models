@@ -1,3 +1,4 @@
+# this script was used to generate the vegetation indices from the MODIStsp 
 library(MODIStsp)
 library(rgeoboundaries)
 library(raster)
