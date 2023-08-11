@@ -5,6 +5,7 @@ library(tidyverse)
 library(viridis)
 library(sf)
 
+
 #### Bioclim #### 
 inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
 bioclim_path <- file.path(inpath_onedrive, "covariate", "wc2.1_30s_bio")
@@ -136,3 +137,6 @@ writeRaster(brick_rasters, filename = file.path(output_folder, "Stacked_tmin_ras
 for(i in 1:nlayers(brick_rasters)) {
   plot(brick_rasters[[i]], main = paste("Layer", i))
 }
+
+
+

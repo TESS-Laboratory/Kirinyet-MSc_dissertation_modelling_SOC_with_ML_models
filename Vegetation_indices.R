@@ -169,3 +169,28 @@ ggplot() +
 
 
 #########################################################
+##resample then replace files into above 
+#raster_files <- c("C:\\workspace\\covariate\\DEM_covariates\\mean_annual_EVI.tif",
+#                  "C:\\workspace\\covariate\\DEM_covariates\\mean_annual_NDVI.tif",
+#                  "C:\\workspace\\covariate\\DEM_covariates\\Mzimvubu_Aspect.tif",
+#                  "C:\\workspace\\covariate\\DEM_covariates\\Mzimvubu_Elevation.tif",
+#                  "C:\\workspace\\covariate\\DEM_covariates\\Mzimvubu_Slope.tif",
+#                  "C:\\workspace\\covariate\\DEM_covariates\\Mzimvubu_TWI.tif")
+#
+# target extent an dresolution
+#output_dir <- "C:\\workspace\\covariate\\DEM_covariates\\"
+#target_extent <- ref_extent
+#target_res <- c(0.008333333, 0.008333333)  
+
+#target_raster <- terra::rast(extent = target_extent, resolution = target_res)
+
+# Loop over each raster file
+#for (file in raster_files) {
+#  rast <- terra::rast(file)
+#  resampled_rast <- terra::resample(rast, target_raster, method = "bilinear")  # adjust method as needed
+  
+  # Save the resampled raster
+ # filename <- paste0("resampled_", tools::file_path_sans_ext(basename(file)), ".tif")
+ # output_filepath <- file.path(output_dir, filename)
+ #terra::writeRaster(resampled_rast, output_filepath, overwrite = TRUE)
+#}
