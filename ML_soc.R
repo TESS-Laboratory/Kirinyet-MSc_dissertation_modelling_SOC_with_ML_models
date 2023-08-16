@@ -1,21 +1,11 @@
 # load packages 
-library(raster)
 library (sf) 
-library(sp)
-library(rgeos)
-library(ncdf4)
-library(terra)
 library(readxl)
 library(janitor)
-library(rasterVis) 
-library(elevatr)
-library(RColorBrewer)
 library(leaflet)
 library(tidyverse)
-library(MODIStsp)
 library(viridis)
-library(rgee)
-
+library(raster)
 # Read the shapefile of the study area and other related data
 inpath<-"C:\\workspace\\Kirinyet-development\\data\\CSA_Baseline_SOC\\"
 CAA<-st_read(paste0(inpath,"Milcah\\CSA_Conservation_Agreement_Areas.shp"))
@@ -26,9 +16,6 @@ mzimvubu <- CSA_NL[CSA_NL$Name == "Mzimvubu Landscape", ] #subset NLA to mzimvub
 plot(mzimvubu["Name"], main= "Mzimvubu")
 
 SOC_points<-SOC_locations["Name"] #
-plot(SOC_points)
-
-
 plot(st_geometry(mzimvubu), col = 'red', pch = 16, cex = 1.3, main = "Mzimvubu and sampling Points")
 plot(st_geometry(SOC_points), col = 'blue', pch = 16, cex = 1.3, add = TRUE)
 
@@ -39,32 +26,19 @@ str(data)
 data_clean<- janitor::clean_names(data)
 View(data_clean)
 
-
 # convert the (x,y)degrees, minutes and seconds into decimal degrees format 
 convert_DMS_to_DD <- function(dms_string) {
-  
-  dms_string <- trimws(dms_string)# Trim white spaces
-  
-  # Check if the input string is already in decimal degrees format
+  dms_string <- trimws(dms_string)
   if (!grepl("’", dms_string)) {
-    # Remove the degree symbol if present
-    dms_string <- gsub("°", "", dms_string)
-    return(as.numeric(dms_string))
+    return(as.numeric(gsub("°", "", dms_string)))
   }
-  
-  # Extract degrees, minutes, and seconds using regular expressions
   degrees <- as.numeric(gsub("^([0-9]+)°.*", "\\1", dms_string))
   minutes <- as.numeric(gsub(".*°([0-9]+)’.*", "\\1", dms_string))
   seconds <- as.numeric(gsub(".*’([0-9.]+)’’.*", "\\1", dms_string))
-  
-  # Convert to decimal degrees
   decimal_degrees <- degrees + minutes / 60 + seconds / 3600
-  
-  # Check if it's South, which should be negative
   if (grepl("S", dms_string, ignore.case = TRUE)) {
     decimal_degrees <- -decimal_degrees
   }
-  
   return(decimal_degrees)
 }
 
@@ -73,7 +47,7 @@ ocs_ec_df <- data_clean %>%
   mutate(lat_decimal = sapply(lat, convert_DMS_to_DD),
          long_decimal = sapply(long, convert_DMS_to_DD))
 
-# Show the updated dataframe
+# check the updated dataframe
 print(ocs_ec_df)
 str(ocs_ec_df)
 
@@ -83,18 +57,18 @@ coordinates(ocs_ec_df) <- ~long_decimal + lat_decimal
 str(ocs_ec_df)
 
 
-# Convert the Eastern Cape shapefile and data points to an sf object
-mzimvubu_sf <- as(mzimvubu, "sf")
+# Convert data points to an sf object
+
 ocs_ec_sf <- st_as_sf(ocs_ec_df) 
 # use WGS 84 (EPSG:4326) to set the Coordinate Reference System
-st_crs(mzimvubu_sf) <- 4326
+st_crs(mzimvubu) <- 4326
 st_crs(ocs_ec_sf) <- 4326
 
 plot(density(ocs_ec_sf$soc_tha))#check the density distribution
 
 # Visualize the data - C_percent scaled by 10 (g/kg)
 data_points <- ggplot() +
-  geom_sf(data = mzimvubu_sf, fill = "lightgray") +
+  geom_sf(data = mzimvubu, fill = "lightgray") +
   geom_sf(data = ocs_ec_sf, aes(shape = treatment, color = c_g_kg)) + 
   ggtitle("Soil Organic Carbon content in g/kg by Treatment") +
   scale_color_viridis(name = "C_g_kg") + 
@@ -124,7 +98,7 @@ print(plot1)
 
 # Plot the point ocs
 ggplot() +
-  geom_sf(data = mzimvubu_sf, fill = "lightgray") +
+  geom_sf(data = mzimvubu, fill = "lightgray") +
   geom_sf(data = ocs_ec_sf, aes(geometry = geometry, color = soc_tha), size = 4) +
   scale_color_viridis(name = "OCS (t/ha)") + 
   labs(title = "Soil Organic Carbon Stock at point",
@@ -134,8 +108,6 @@ ggplot() +
 
 
 #### interactive maps for datapoints and c_percent ####
-# Extract longitude and latitude from geometry column
-
 coords <- st_coordinates(ocs_ec_sf$geometry)
 ocs_ec_sf$longitude <- coords[, 1]
 ocs_ec_sf$latitude <- coords[, 2]
@@ -183,8 +155,6 @@ ggplot() +
 
 
 #### ISRIC legacy maps ####
-# Load each shapefile Using SF package
-
 inpath_legacy<-"C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data\\SOTWIS_SAF\\SOTWIS_SAF\\GIS\\"
 parametersestimates <- st_read(paste0(inpath_legacy, "SOTWIS\\SOTWIS_0-20cm_parametersestimates\\SOTWIS_SAFv1_t1s1d1.shp"))
 soterunitcomposition <- st_read(paste0(inpath_legacy, "SOTWIS\\SOTWIS_soterunitcomposition\\SOTWIS_SAFv1_soterunitcomposition.shp"))
@@ -223,61 +193,32 @@ ggplot() +
 # Now crop the properties to the mzimvubu region 
 terrainproperties_cropped <- st_crop(terrainproperties, mzimvubu)
 parametersestimates_cropped <- st_crop(parametersestimates, mzimvubu)
-soterunitcomposition_cropped <- st_crop(soterunitcomposition,mzimvubu)
-
-
-for (dataset in list(terrainproperties_cropped,parametersestimates_cropped,soterunitcomposition_cropped)) {
-  str(dataset)
-  print(head(dataset, n = 5))
-  print(summary(dataset)) 
-}
-
-#  plot the cropped terrainproperties and parameterestimates
-ggplot() +
-  geom_sf(data = terrainproperties_cropped, aes(fill = SOILS)) +
-  theme_minimal() +
-  ggtitle("Terrain Properties - Mzimvubu soils") +
-  scale_fill_viridis_d() +
-  theme(legend.position = "bottom")
-
-ggplot() +
-  geom_sf(data = parametersestimates_cropped, aes(fill = TOTC)) +
-  theme_minimal() +
-  ggtitle("Parameter Estimates - Mzimvubu") +
-  scale_fill_viridis_c() +
-  theme(legend.position = "bottom")
-
-ggplot() +
-  geom_sf(data = parametersestimates_cropped, aes(fill =BULK)) +
-  theme_minimal() +
-  ggtitle("Parameters Estimates-Mzimvubu") +
-  scale_fill_viridis_c() +
-  theme(legend.position = "bottom")
-
-ggplot() +
-  geom_sf(data = parametersestimates_cropped, aes(fill =TOTN)) +
-  theme_minimal() +
-  ggtitle("Parameters Estimates-total nitrogen (g kg-1)") +
-  scale_fill_viridis_c() +
-  theme(legend.position = "bottom")
 
 summary(parametersestimates_cropped$BULK) ## compare to estimated bulk density
 
 
-###########################
+#### Extract relevant covariates
+cols_terrain <- c("LITHOLOGY", "LANDFORM")
+terrain_selected <- terrainproperties_cropped[, cols_terrain]
 
-# Build a raster stack of the covariates
-covariate_stack <- stack(elevation, slope, aspect, min_temp, max_temp, rainfall, land_use)
+cols_parameters <- c("CECC", "PHAQ", "TOTC", "TOTN", "ECEC", "STPC", "CLPC", "BULK", "CECS", "SDTO")
+parameters_selected <- parametersestimates_cropped[, cols_parameters]
 
-# Use the raster stack for modelling with point data 
-# ...m
+save_sf_as_shp_masked <- function(sf_object, mzimvubu, output_directory) {
+  masked_sf <- st_intersection(sf_object, mzimvubu)
+  object_name <- deparse(substitute(sf_object))
+  full_path <- file.path(output_directory, paste0(object_name, ".shp"))
+  st_write(masked_sf, full_path)
+}
 
+output_path_sf <- "C:\\workspace\\covariate\\soils\\"
+save_sf_as_shp_masked(terrain_selected, mzimvubu, output_path_sf)
+save_sf_as_shp_masked(parameters_selected, mzimvubu, output_path_sf)
 
 ####mean SOC \(Venter et al 2021)####
-
-file_path <- paste0(inpath_onedrive, "\\SOC_sa\\SOC_mean_30m_1.tif")
+inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
+file_path <- paste0(inpath_onedrive, "\\SOC_sa\\mean_soc.tif")
 raster_layer <- raster::raster(file_path)
-cropped_layer <- raster::crop(raster_layer, mzimvubu)
-plot(cropped_layer,main = "Soil Organic Carbon (SOC) Trend", 
+plot(raster_layer,main = "Soil Organic Carbon (SOC) mean", 
      xlab = "Longitude", ylab = "Latitude")
 
