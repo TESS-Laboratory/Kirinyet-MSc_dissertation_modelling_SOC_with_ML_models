@@ -4,7 +4,7 @@ library(sp)
 library(tidyverse)
 library(viridis)
 library(sf)
-
+library(geodata)
 
 #### Bioclim #### 
 inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"

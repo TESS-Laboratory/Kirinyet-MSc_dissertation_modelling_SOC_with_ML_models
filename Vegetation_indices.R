@@ -169,7 +169,6 @@ ggplot() +
 
 
 #########################################################
-##resample then replace files into above 
 #raster_files <- c("C:\\workspace\\covariate\\DEM_covariates\\mean_annual_EVI.tif",
 #                  "C:\\workspace\\covariate\\DEM_covariates\\mean_annual_NDVI.tif",
 #                  "C:\\workspace\\covariate\\DEM_covariates\\Mzimvubu_Aspect.tif",

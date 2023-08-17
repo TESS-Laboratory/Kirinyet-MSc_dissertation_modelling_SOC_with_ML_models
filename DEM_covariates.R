@@ -47,4 +47,3 @@ plot(aspect, main="Aspect for mzimvubu (degrees)", col=topo.colors(6,alpha=0.6))
 plot(twi, main="Topographic Wetness Index for mzimvubu", col=topo.colors(6, alpha=0.6))
 
 
-

@@ -58,7 +58,6 @@ str(ocs_ec_df)
 
 
 # Convert data points to an sf object
-
 ocs_ec_sf <- st_as_sf(ocs_ec_df) 
 # use WGS 84 (EPSG:4326) to set the Coordinate Reference System
 st_crs(mzimvubu) <- 4326
