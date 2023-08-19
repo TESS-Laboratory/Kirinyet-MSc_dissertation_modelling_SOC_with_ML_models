@@ -14,95 +14,54 @@ library(gstat)
 library(sp)
 library(mlr3viz)
 library(terra)
+
 # Read raster files
 raster_files <- c(
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_1.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_2.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_3.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_4.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_5.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_6.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_7.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_8.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_9.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_10.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_11.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_12.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_13.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_14.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_15.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_16.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_17.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_18.tif",
-  "C:\\workspace\\covariate\\Bioclim\\Bioclim_data_19.tif",
-   "C:\\workspace\\covariate\\DEM_covariates\\resampled_Mzimvubu_TWI.tif",
-  "C:\\workspace\\covariate\\DEM_covariates\\resampled_mean_annual_EVI.tif",
-  "C:\\workspace\\covariate\\DEM_covariates\\resampled_mean_annual_NDVI.tif",
-  "C:\\workspace\\covariate\\DEM_covariates\\resampled_Mzimvubu_Aspect.tif",
-  "C:\\workspace\\covariate\\DEM_covariates\\resampled_Mzimvubu_Elevation.tif",
-  "C:\\workspace\\covariate\\DEM_covariates\\resampled_Mzimvubu_Slope.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_12.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_01.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_02.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_03.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_04.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_05.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_06.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_07.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_08.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_09.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_10.tif",
-  "C:\\workspace\\covariate\\tmax\\tmax_wc2.1_30s_tmax_11.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_03.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_04.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_05.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_06.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_07.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_08.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_09.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_10.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_11.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_12.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_01.tif",
-  "C:\\workspace\\covariate\\prec\\prec_wc2.1_30s_prec_02.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_12.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_01.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_02.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_03.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_04.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_05.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_06.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_07.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_08.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_09.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_10.tif",
-  "C:\\workspace\\covariate\\tmin\\tmin_wc2.1_30s_tmin_11.tif"
+  "Covariates\\Bioclim\\Bioclim_data_2.tif",
+  "Covariates\\Bioclim\\Bioclim_data_3.tif",
+  "Covariates\\Bioclim\\Bioclim_data_4.tif",
+  "Covariates\\Bioclim\\Bioclim_data_5.tif",
+  "Covariates\\Bioclim\\Bioclim_data_6.tif",
+  "Covariates\\Bioclim\\Bioclim_data_7.tif",
+  "Covariates\\Bioclim\\Bioclim_data_8.tif",
+  "Covariates\\Bioclim\\Bioclim_data_9.tif",
+  "Covariates\\Bioclim\\Bioclim_data_10.tif",
+  "Covariates\\Bioclim\\Bioclim_data_11.tif",
+  "Covariates\\Bioclim\\Bioclim_data_12.tif",
+  "Covariates\\Bioclim\\Bioclim_data_13.tif",
+  "Covariates\\Bioclim\\Bioclim_data_14.tif",
+  "Covariates\\Bioclim\\Bioclim_data_15.tif",
+  "Covariates\\Bioclim\\Bioclim_data_16.tif",
+  "Covariates\\Bioclim\\Bioclim_data_17.tif",
+  "Covariates\\Bioclim\\Bioclim_data_18.tif",
+  "Covariates\\Bioclim\\Bioclim_data_19.tif",
+  "Covariates\\Bioclim\\Bioclim_data_1.tif",
+  "Covariates\\DEM_covariates\\resampled_Mzimvubu_TWI.tif",
+  "Covariates\\DEM_covariates\\resampled_mean_annual_EVI.tif",
+  "Covariates\\DEM_covariates\\resampled_mean_annual_NDVI.tif",
+  "Covariates\\DEM_covariates\\resampled_Mzimvubu_Aspect.tif",
+  "Covariates\\DEM_covariates\\resampled_Mzimvubu_Elevation.tif",
+  "Covariates\\DEM_covariates\\resampled_Mzimvubu_Slope.tif"
   
 )
 
 covariates_stack <- terra::rast(raster_files)
-
-  #legacy soil data
-soils <- shapefile("C:\\workspace\\mzimvubusoils.shp")
-legacy_parameters <-shapefile("C:\\workspace\\covariate\\soils\\parameters_selected.shp")
-legacy_lithology <- shapefile("C:\\workspace\\covariate\\soils\\terrain_selected.shp")
+plot(covariates_stack[[17:25]])
+#legacy soil data
+soils <- shapefile("data\\mzimvubusoils.shp")
+legacy_parameters <-shapefile("Covariates\\soils\\parameters_selected.shp")
+legacy_lithology <- shapefile("Covariates\\soils\\terrain_selected.shp")
 
 soils@data$DOMSOI <- as.factor(soils@data$DOMSOI)
 legacy_lithology@data$LITHOLOGY<-as.factor(legacy_lithology@data$LITHOLOGY)
 legacy_lithology@data$LANDFORM<-as.factor(legacy_lithology@data$LANDFORM)
-str(soils)
+#str(soils)
 
 #########
-
-covariates_stack <- terra::rast(raster_files)
-plot(covariates_stack[[15:25]])
-
 coords <- st_coordinates(ocs_ec_sf$geometry)
 ocs_ec_sf$longitude <- coords[, 1]
 ocs_ec_sf$latitude <- coords[, 2]
 
-
-# Extract raster values and soil classes at the locations of the points
 covariates_values <- terra::extract(covariates_stack, ocs_ec_sf)
 ocs_ec_vect <- terra::vect(ocs_ec_sf) # Convert sf object to SpatVector
 soils_vect <- terra::vect(soils)
@@ -118,7 +77,7 @@ merged_data <- cbind(data_for_model, ocs_ec_vect)
 dup_cols <- names(merged_data)[duplicated(names(merged_data))]
 merged_data <- merged_data[!names(merged_data) %in% dup_cols]
 
-# Step 2: Remove the specific columns you listed
+# Remove the specific columns you listed
 columns_to_remove <- c('PHASE1', 'ID', 'PHASE2', 'MISCLU1', 
                        'MISCLU2', 'PERMAFROST', "fid",
                        "SNUM", "PHASE1", "PHASE2", "FAOSOIL", "SQKM",
@@ -126,7 +85,7 @@ columns_to_remove <- c('PHASE1', 'ID', 'PHASE2', 'MISCLU1',
                        "lab_no", "CNTCODE" ,"COUNTRY", "treatment", "x1_cf",
                        "soc_g_cm2" ,"soc_kg_cm2", "lat", "long", "c", "soil_depth_m",
                        "klei_clay", "slik_silt", "p_h" , "sand", "CNTNAME", "c_g_kg",
-                       "soilbd", "longitude", "latitude")
+                       "soilbd", "longitude", "latitude","TOTC")
 
 merged_data <- merged_data %>% dplyr::select(-all_of(columns_to_remove))
 merged_data <- merged_data[-c(73, 74, 75, 76), ]
@@ -156,7 +115,6 @@ design <- benchmark_grid(
   resamplings = resampling
 )
 
-
 bmr <- benchmark(design)# Run the benchmark
 print(bmr)
 
@@ -167,7 +125,6 @@ autoplot(bmr, type = "boxplot")
 
 
 ##################################
-set.seed(183)
 #random forest
 # Step 1: Create a Task
 task <- TaskRegr$new(id = "mzimvubu_sf", backend = merged_data, target = "soc_tha")
@@ -185,8 +142,8 @@ predictions$score(msr("regr.mae"))
 predictions$score(msr("regr.rsq"))
 
 #new random points within the study area
-mzimvubu_sf <- st_read("C:\\workspace\\Kirinyet-development\\data\\mzimvubu_sf.shp") 
-new_locations <- st_sample(mzimvubu_sf, size = 100, type = "random")# Generate 100random points within the study area
+mzimvubu_sf <- st_read("data\\mzimvubu_sf.shp") 
+new_locations <- st_sample(mzimvubu_sf, size = 100, type = "random")
 
 # Convert the object to an sf object
 new_locations_sf <- st_sf(new_locations)
@@ -194,41 +151,33 @@ covariates_values_new <- terra::extract(covariates_stack, new_locations_sf)
 soil_classes_new <- terra::extract(soils_vect, terra::vect(new_locations_sf))
 legacy_parameters_new <-terra::extract(legacy_parameters_vect, terra::vect(new_locations_sf))
 legacy_lithology_new <-terra::extract(legacy_lithology_vect, terra::vect(new_locations_sf))
-data_for_model_new <- cbind(as.data.frame(covariates_values_new), as.data.frame(soil_classes_new),as.data.frame(legacy_parameters_new),as.data.frame(legacy_lithology_new))
 
-# Identify and remove duplicate columns
-unique_cols <- !duplicated(names(data_for_model_new))
-data_for_model_unique <- data_for_model_new[, unique_cols]
+data_for_model_new <- new_data_for_model <- cbind(
+  as.data.frame(covariates_values_new),
+  as.data.frame(soil_classes_new),
+  as.data.frame(legacy_parameters_new),
+  as.data.frame(legacy_lithology_new)
+)
 
-# Remove the listed columns using dplyr::select
-data_for_model_cleaned <- dplyr::select(data_for_model_unique, -c('PHASE1','ID', 'PHASE2', 'MISCLU1', 
-                                                                  'MISCLU2', 'PERMAFROST',"id.y","fid", 
-                                                                  "SNUM","PHASE1", "PHASE2", "FAOSOIL",
-                                                                  "CNTCODE" ,"CNTNAME", "SQKM","COUNTRY",
-                                                                  "id.y", "Name", "area_ha", "area_km2"))
 
-data_for_model_cleaned<- janitor::clean_names(data_for_model_new)
-data_for_model_cleaned <- na.omit(data_for_model_new)
+new_merged_data <- cbind(data_for_model_new, new_locations_sf)
+new_merged_data <- new_merged_data[!names(new_merged_data) %in% dup_cols]
+new_merged_data <- janitor::clean_names(new_merged_data)
+required_cols <- setdiff(colnames(merged_data), "soc_tha")
+new_merged_data <- new_merged_data[, required_cols]
 
-# Identify columns with NA values
-na_cols <- names(data_for_model_cleaned)[colSums(is.na(data_for_model_cleaned)) > 0]
-
-# Now fill those columns with their respective means
-for (col in na_cols) {
-  if (is.numeric(data_for_model_cleaned[[col]])) {
-    missing_value_indices <- which(is.na(data_for_model_cleaned[[col]]))
-    data_for_model_cleaned[missing_value_indices, col] <- mean(data_for_model_cleaned[[col]], na.rm = TRUE)
+# Replace NAs with the mean of the respective column for each column
+new_merged_data <- as.data.frame(lapply(new_merged_data, function(x) {
+  if (is.numeric(x) && any(is.na(x))) {
+    x[is.na(x)] <- mean(x, na.rm = TRUE)
   }
-}
-data_for_model_cleaned <- data_for_model_cleaned[!is.na(data_for_model_cleaned$domsoi), ]
-data_for_model_cleaned <- data_for_model_cleaned[-77]
+  return(x)
+}))
 
-# Creating a new task with the cleaned data
-data_for_model_cleaned$dummy_target <- rep(0, nrow(data_for_model_cleaned))
-task_cleaned <- TaskRegr$new(id = "mzimvubu_sf_cleaned", backend = data_for_model_cleaned, target = "dummy_target")
+any(is.na(new_merged_data))
 
-# Predicting on the new task
-predictions_cleaned <- learner$predict(task_cleaned)
+predictions <- learner$predict_newdata(newdata = new_merged_data)
+print(predictions)
 
 ####
 # Get variable importance
@@ -248,32 +197,45 @@ ggplot(importance_df, aes(x = reorder(variable, importance), y = importance)) +
   theme_minimal()
 
 
-##########################################################################################
-set.seed(183)
-# XGBOOST
-task <- TaskRegr$new(id = "mzimvubu_sf", backend = merged_data, target = "soc_tha")
-learner <- lrn("regr.xgboost", nrounds = 100)
-po <- po("encode", method = "one-hot")
-task = po$train(list(task))[[1]]
+new_locations_sf$response <- predictions$response
 
-train_set <- sample(task$nrow, 0.8 * task$nrow) # 80% of the data
-test_set <- setdiff(seq_len(task$nrow), train_set) # the rest 20% of the data
+#ggplot(data = new_locations_sf) +
+  #geom_sf(aes(color = response), size = 3) +
+  #scale_color_viridis_c() +
+  #theme_minimal() +
+  #labs(title = "Soil Carbon Predictions for New Locations", 
+      # color = "SOC (t/ha)")
 
-learner$train(task, row_ids = train_set)
+######IDW interporlation
 
-predictions <- learner$predict(task, row_ids = test_set)
-print(predictions)
+coords <- as.matrix(st_coordinates(new_locations_sf))
+data <- as.data.frame(new_locations_sf)
+proj <- CRS(as.character(st_crs(new_locations_sf)$proj4string))
+new_locations_sp <- SpatialPointsDataFrame(coords, data, proj4string = proj)
 
-predictions$score(msr("regr.mse"))
-predictions$score(msr("regr.mae"))
-predictions$score(msr("regr.rsq"))
+bbox <- bbox(new_locations_sp)
+cs <- 0.008333333 # Define the cell size (adjust based on your data)
+grid <- expand.grid(x = seq(from = bbox[1, 1], to = bbox[1, 2], by = cs), 
+                    y = seq(from = bbox[2, 1], to = bbox[2, 2], by = cs))
+
+gridded_data <- SpatialPixelsDataFrame(points = grid, 
+                                       data = data.frame(id = 1:nrow(grid)), 
+                                       proj4string = CRS(proj4string(new_locations_sp)))
+
+# Specify the target grid (here based on the bounding box of your points)
+x.range <- range(new_locations_sp@coords[,1])
+y.range <- range(new_locations_sp@coords[,2])
+grid <- expand.grid(x = seq(from = x.range[1], to = x.range[2], by = cs), 
+                    y = seq(from = y.range[1], to = y.range[2], by = cs))
+gridded_data <- SpatialPixelsDataFrame(points = grid, 
+                                       data = data.frame(id = 1:nrow(grid)), 
+                                       proj4string = CRS(proj4string(new_locations_sp)))
+
+idw_output <- idw(formula = response ~ 1, locations = new_locations_sp, newdata = gridded_data, idp = 2.0)
+mzimvubu_sp <- as(mzimvubu_sf, "Spatial")
+idw_raster <- raster(idw_output)
+masked_raster <- mask(idw_raster, mzimvubu_sp)
+plot(masked_raster, main = "Predicted soil organic carbon in tons per hactare")
 
 
-###
-# 
-terra::plot(template_raster)
-plot(new_locations_sf, add=TRUE, col="red", pch=16, cex=0.5)
-
-predictions_new <- learner$predict(task_new)
-data_for_model_new$soc_tha <- predictions_new$data$truth
-data_for_model_new$soc_tha <- predictions_new$response
+##################################################
