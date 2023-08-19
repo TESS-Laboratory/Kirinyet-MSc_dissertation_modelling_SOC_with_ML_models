@@ -140,14 +140,14 @@ print(map)
 
 #Soils
 
-soils<- st_read("C:\\workspace\\mzimvubusoils.shp")
+soils<- st_read("C:\\workspace\\Kirinyet-development\\data\\mzimvubusoils.shp")
 summary(soils)
 print(soils$DOMSOI)
 
 #  plot
 ggplot() +
   geom_sf(data = soils, aes(fill = DOMSOI)) + 
-  geom_sf(data = SOC_points, color = "blue") +
+  #geom_sf(data = SOC_points, color = "blue") +
   theme_minimal() +
   labs(fill = "Dominant Soil")
 
@@ -218,6 +218,11 @@ save_sf_as_shp_masked(parameters_selected, mzimvubu, output_path_sf)
 inpath_onedrive <- "C:\\Users\\milcah\\OneDrive\\EC_project\\Eastern Cape data"
 file_path <- paste0(inpath_onedrive, "\\SOC_sa\\mean_soc.tif")
 raster_layer <- raster::raster(file_path)
-plot(raster_layer,main = "Soil Organic Carbon (SOC) mean", 
+plot(raster_layer,main = "Soil Organic Carbon mean 1984 - 2019 (kg C m-2)", 
      xlab = "Longitude", ylab = "Latitude")
 
+### Global soc map at 250m resolution
+
+GSOC<-raster(paste0(inpath_onedrive,"\\Isric data\\GSOC_m_30cm_250m.tif"))
+plot(GSOC,main = "Subset of Global soil organic carbon map(t/ha)",
+     xlab = "Longitude", ylab = "Latitude") 
