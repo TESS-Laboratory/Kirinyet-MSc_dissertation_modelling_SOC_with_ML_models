@@ -141,6 +141,7 @@ predictions$score(msr("regr.mse"))
 predictions$score(msr("regr.mae"))
 predictions$score(msr("regr.rsq"))
 
+# use the trained model for prediction
 #new random points within the study area
 mzimvubu_sf <- st_read("data\\mzimvubu_sf.shp") 
 new_locations <- st_sample(mzimvubu_sf, size = 100, type = "random")
@@ -241,24 +242,25 @@ plot(masked_raster, main = "Predicted soil organic carbon in tons per hactare")
 ##################################################
 #Just for comparison if the model improves on 80-20 
 # Train the XGBoost model
-graph <- po("encode", method = "one-hot", affect_columns = selector_type("factor"))
-task <- graph$train(list(task))[[1]]
+#graph <- po("encode", method = "one-hot", affect_columns = selector_type("factor"))
+#task <- graph$train(list(task))[[1]]
+# Create an XGBoost learner
+#learner_xgb <- lrn("regr.xgboost", nrounds = 100, objective = "reg:squarederror")
+#learner_xgb$train(task, row_ids = train_set)
 
-learner_xgb$train(task, row_ids = train_set)
+#predictions_xgb <- learner_xgb$predict(task, row_ids = test_set)
 
-predictions_xgb <- learner_xgb$predict(task, row_ids = test_set)
-
-predictions_xgb$score(msr("regr.mse"))
-predictions_xgb$score(msr("regr.mae"))
-predictions_xgb$score(msr("regr.rsq"))
+#predictions_xgb$score(msr("regr.mse"))
+#predictions_xgb$score(msr("regr.mae"))
+#predictions_xgb$score(msr("regr.rsq"))
 
 #################
 # Train the SVM model
-learner_svm <- lrn("regr.svm")
-learner_svm$train(task, row_ids = train_set)
-predictions_svm <- learner_svm$predict(task, row_ids = test_set)
+#learner_svm <- lrn("regr.svm")
+#learner_svm$train(task, row_ids = train_set)
+#predictions_svm <- learner_svm$predict(task, row_ids = test_set)
 
 # Compute MSE and MAE
- predictions_svm$score(msr("regr.mse"))
- predictions_svm$score(msr("regr.mae"))
-predictions_svm$score(msr("regr.rsq"))
+# predictions_svm$score(msr("regr.mse"))
+ #predictions_svm$score(msr("regr.mae"))
+#predictions_svm$score(msr("regr.rsq"))
