@@ -239,3 +239,26 @@ plot(masked_raster, main = "Predicted soil organic carbon in tons per hactare")
 
 
 ##################################################
+#Just for comparison if the model improves on 80-20 
+# Train the XGBoost model
+graph <- po("encode", method = "one-hot", affect_columns = selector_type("factor"))
+task <- graph$train(list(task))[[1]]
+
+learner_xgb$train(task, row_ids = train_set)
+
+predictions_xgb <- learner_xgb$predict(task, row_ids = test_set)
+
+predictions_xgb$score(msr("regr.mse"))
+predictions_xgb$score(msr("regr.mae"))
+predictions_xgb$score(msr("regr.rsq"))
+
+#################
+# Train the SVM model
+learner_svm <- lrn("regr.svm")
+learner_svm$train(task, row_ids = train_set)
+predictions_svm <- learner_svm$predict(task, row_ids = test_set)
+
+# Compute MSE and MAE
+ predictions_svm$score(msr("regr.mse"))
+ predictions_svm$score(msr("regr.mae"))
+predictions_svm$score(msr("regr.rsq"))
