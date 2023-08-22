@@ -1,3 +1,5 @@
+# This script was used to generate MSAVI data.
+#The preprocessing of this data was not included in the modelling owing to time constrain
 library(gdalcubes)
 library(rstac)
 library(sf)
