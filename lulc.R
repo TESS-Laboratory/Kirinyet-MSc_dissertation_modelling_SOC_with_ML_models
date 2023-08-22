@@ -1,4 +1,6 @@
-# The data in this script were downloaded from ESRI and preprocessed in QGIS 
+# The data in this script were downloaded from ESRI and preprocessed in QGIS however, the merging and reprojecting to WGS48
+# caused a mismatch in the the extraction to the extent of mzimvubu boundaries, the data here were not include in the modelling though 
+#they were used for visual examination of land use change. No significant difference was noted for the data period 2017-2022
 library(terra)
 library(raster)
 
